@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: mad-garage-api
+
+  # Database Setup (MySQL 8.0)
+  datasource:
+    url: jdbc:mysql://localhost:3306/madgarage?serverTimezone=UTC
+    username: root # "root" is usually the default for local MySQL
+    password: root # Change this to your actual MySQL password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # Hibernate (Database ORM) Setup
+  jpa:
+    hibernate:
+      ddl-auto: update # Automatically creates your tables!
+    show-sql: true # Prints SQL queries in your console
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  # Spring AI Setup (Google Gemini)
+  ai:
+    google:
+      genai:
+        api-key: AIzaSyDUrrGxoNqHXcNVz79l-o_xhZcCgrm6-04
+        chat:
+          options:
+            model: gemini-2.5-flash
