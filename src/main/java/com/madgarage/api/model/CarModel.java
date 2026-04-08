@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +17,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@ToString
 @Entity
 @Table(name = "models")
 public class CarModel {
@@ -29,10 +32,14 @@ public class CarModel {
     // Links this model to a brand (like "Hyundai")
     @ManyToOne
     @JoinColumn(name = "make_id", nullable = false)
+    @JsonIgnore
+    @ToString.Exclude
     private Make make;
 
     // One Model can have many different Years/Variants
     @OneToMany(mappedBy = "carModel", cascade = CascadeType.ALL)
     @Builder.Default
+    @JsonIgnore
+    @ToString.Exclude
     private List<Vehicle> vehicles = new ArrayList<>();
 }

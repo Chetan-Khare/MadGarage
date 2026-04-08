@@ -1,6 +1,8 @@
 package com.madgarage.api.repository;
 
+import com.madgarage.api.enums.FitmentCategory;
 import com.madgarage.api.model.Product;
+import com.madgarage.api.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,16 +13,30 @@ import java.util.List;
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
-    @Query("SELECT p FROM Product p JOIN p.fittedVehicles v " +
-            "WHERE v.carModel.make.name = :makeName " +
-            "AND v.carModel.name = :modelName " +
-            "AND v.year = :year " +
-            "AND LOWER(v.trim) = LOWER(:trim) " +
-            "AND p.category = :partCategory") // Simplified to match Product.java
-    List<Product> findGuaranteedFitParts(
-            @Param("makeName") String makeName,
-            @Param("modelName") String modelName,
-            @Param("year") Integer year,
-            @Param("trim") String trim,
-            @Param("partCategory") String partCategory);
+        @Query("SELECT p FROM Product p JOIN p.fittedVehicles v " +
+                        "WHERE v.carModel.make.name = :makeName " +
+                        "AND v.carModel.name = :modelName " +
+                        "AND v.year = :year " +
+                        "AND LOWER(v.fuelType) = LOWER(:fuelType) " +
+                        "AND LOWER(v.trim) = LOWER(:trim) " +
+                        "AND LOWER(v.engineType) = LOWER(:engineType) " +
+                        "AND p.category = :partCategory")
+        List<Product> findGuaranteedFitParts(
+                        @Param("makeName") String makeName,
+                        @Param("modelName") String modelName,
+                        @Param("year") Integer year,
+                        @Param("fuelType") String fuelType,
+                        @Param("trim") String trim,
+                        @Param("engineType") String engineType,
+                        @Param("partCategory") String partCategory);
+
+        List<Product> findByFittedVehiclesId(Long vehicleId);
+
+        List<Product> findByCategoryAndFittedVehiclesId(String category, Long vehicleId);
+
+        List<Product> findByFitmentCategory(FitmentCategory fitmentCategory);
+
+        long countBySeller(User seller);
+
+        List<Product> findBySeller(User seller);
 }

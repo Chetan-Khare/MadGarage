@@ -1,5 +1,6 @@
 package com.madgarage.api.dto;
 import lombok.Data;
+import java.util.List;
 
 @Data
 public class GarageProductDTO {
@@ -8,4 +9,9 @@ public class GarageProductDTO {
     private Double originalPrice;
     private Double garagePrice; // The 5% off price
     private String imageUrl;
+    private String condition;
+    private String color;
+    private String category;
+    private Integer stockQuantity;
+    private List<String> imageUrls;
 }

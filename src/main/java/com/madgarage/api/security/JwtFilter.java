@@ -1,5 +1,6 @@
 package com.madgarage.api.security;
 
+import com.madgarage.api.services.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,10 +18,10 @@ import java.util.Collections;
 @Component
 public class JwtFilter extends OncePerRequestFilter {
 
-    private final JwtUtil jwtUtil;
+    private final JwtService jwtService;
 
-    public JwtFilter(JwtUtil jwtUtil) {
-        this.jwtUtil = jwtUtil;
+    public JwtFilter(JwtService jwtService) {
+        this.jwtService = jwtService;
     }
 
     @Override
@@ -47,8 +48,8 @@ public class JwtFilter extends OncePerRequestFilter {
 
         try {
             // 4. Read the email and role from the token
-            String email = jwtUtil.extractEmail(token);
-            String role = jwtUtil.extractRole(token);
+            String email = jwtService.extractEmail(token);
+            String role = jwtService.extractRole(token);
 
             // 5. If the token is valid, tell Spring Security to unlock the door!
             if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {

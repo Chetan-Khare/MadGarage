@@ -30,7 +30,7 @@ public class GarageAssistantService {
     public GarageAssistantService(ChatClient.Builder chatClientBuilder, ProductRepository productRepository) {
         this.chatClient = chatClientBuilder
                 .defaultOptions(GoogleGenAiChatOptions.builder()
-                        .model("gemini-1.5-flash")
+                        .model("gemma-4-26b")
                         .build())
                 .build();
         this.productRepository = productRepository;
@@ -61,24 +61,16 @@ public class GarageAssistantService {
 
         PERSONALITY:
         - Warm, helpful, and conversational.
-        - If the user sends a casual greeting or asks who you are, introduce yourself \
-          as\"Your Mad Garage Virtual Mechanic\" and invite them to share their vehicle details.
-        - NEVER respond with an error or say you can't identify a vehicle just because \
-          the user is chatting casually.
+        - Introduce yourself as "Your Mad Garage Virtual Mechanic".
 
-        GOAL — Extract vehicle details when present:
-        Extract (Make, Model, Year, Trim) from the user's message, if provided.
+        GOAL — Extract vehicle details when present (6-step chain):
+        Extract (Make, Model, Year, Fuel, Trim, Engine) from the user's message.
 
         RULES:
-        1. Every car has specific trim levels (e.g., Hyundai Creta: SX, SX(O); \
-           Mahindra Scorpio: AX, LX).
-        2. If the user gives a model but NO trim, set needsMoreInfo=true and ask \
-           which trim specifically: "I see you have a [Model]. Is that the [Trim A] or [Trim B]?"
-        3. If the message has NO vehicle info at all (e.g., just a greeting or a \
-           general question), set needsMoreInfo=true and set message to a friendly \
-           introductory response asking for their vehicle details.
-        4. Do NOT guess. Do NOT say "I can't identify". Be friendly always.
-        5. Once you have all details including trim, set needsMoreInfo=false.
+        1. Car parts are specific to Fuel Type (Petrol, Diesel, EV, etc.) and Engine (e.g., 1.2L, 2.0L TDI).
+        2. If any of these are missing (Make, Model, Year, Fuel, Trim, Engine), set needsMoreInfo=true and ask for them politely.
+        3. Only set needsMoreInfo=false once you have all 6 vehicle attributes.
+        4. If the message is just a greeting, ask for the vehicle details.
         """;
 
         try {
@@ -115,16 +107,18 @@ public class GarageAssistantService {
                     aiData.make(),
                     aiData.model(),
                     aiData.year(),
+                    aiData.fuel(),
                     aiData.trim(),
+                    aiData.engine(),
                     aiData.category()
             );
 
             String successMsg = products.isEmpty()
                 ? "I looked up parts for your " + aiData.year() + " " + aiData.make() + " " + aiData.model()
-                  + " (" + aiData.trim() + ") but didn't find an exact match yet. Our inventory is updated regularly — check back soon! 🔧"
+                  + " (" + aiData.fuel() + ", " + aiData.trim() + ", " + aiData.engine() + ") but didn't find an exact match yet."
                 : "Great news! 🎉 I found " + products.size() + " part(s) for your "
                   + aiData.year() + " " + aiData.make() + " " + aiData.model()
-                  + " (" + aiData.trim() + "):";
+                  + " (" + aiData.fuel() + ", " + aiData.trim() + ", " + aiData.engine() + "):";
 
             return new AssistantResult(successMsg, products, false);
 

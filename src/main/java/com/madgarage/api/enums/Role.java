@@ -1,8 +1,8 @@
 package com.madgarage.api.enums;
 
 public enum Role {
-    ADMIN,
-    SELLER,
-    GARAGE,
-    CUSTOMER
+    ROLE_ADMIN,
+    ROLE_SELLER,
+    ROLE_GARAGE,
+    ROLE_CUSTOMER
 }

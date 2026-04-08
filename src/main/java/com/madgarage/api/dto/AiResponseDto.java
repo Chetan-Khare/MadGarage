@@ -3,7 +3,9 @@ package com.madgarage.api.dto;
 public record AiResponseDto(String make,
                             String model,
                             Integer year,
-                            String trim,      // Added Trim
+                            String fuel,      // Added Fuel
+                            String trim,
+                            String engine,    // Added Engine
                             String category,
-                            String message,   // The AI's "voice" (e.g., "Is that the SX or SX(O)?")
+                            String message,   // The AI's "voice"
                             boolean needsMoreInfo) {}

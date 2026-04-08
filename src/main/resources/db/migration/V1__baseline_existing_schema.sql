@@ -1,0 +1,8 @@
+-- V1 Baseline: Existing schema was created by Hibernate (ddl-auto=update).
+-- Flyway is configured with baseline-on-migrate=true, which stamps the
+-- current database state as "V1" without executing this script.
+-- Future schema changes should be added as V2__description.sql, V3__description.sql, etc.
+--
+-- Example of a future migration:
+-- V2__add_address_to_users.sql
+--   ALTER TABLE users ADD COLUMN street_address VARCHAR(255);

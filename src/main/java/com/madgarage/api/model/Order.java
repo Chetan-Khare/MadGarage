@@ -8,10 +8,12 @@ import java.util.List;
 
 @Entity
 @Table(name = "orders")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@ToString
 public class Order {
 
     @Id
@@ -22,12 +24,22 @@ public class Order {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    private Double totalAmount;
+    private Double subtotal;
+    private Double taxAmount;
+    private Double shippingFee;
+    private Double grandTotal;
     private String status;
     private LocalDateTime orderDate;
 
+    // Shipping Details
+    private String shippingAddress;
+    private String city;
+    private String state;
+    private String pincode;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
+    @ToString.Exclude
     private List<OrderItem> items = new ArrayList<>();
 
     public void addOrderItem(OrderItem item) {

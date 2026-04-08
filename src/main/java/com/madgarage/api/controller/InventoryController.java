@@ -1,41 +1,39 @@
 package com.madgarage.api.controller;
 
-import com.madgarage.api.model.Product;
-import com.madgarage.api.model.Vehicle;
-import com.madgarage.api.repository.ProductRepository;
-import com.madgarage.api.repository.VehicleRepository;
+import com.madgarage.api.dto.Base64ProductRequest;
+import com.madgarage.api.dto.ProductResponse;
+import com.madgarage.api.dto.SellerAnalyticsResponse;
+import com.madgarage.api.model.User;
+import com.madgarage.api.services.InventoryService;
+import com.madgarage.api.services.ProductCreationService;
+import com.madgarage.api.services.UserService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.HashSet;
+import java.security.Principal;
 import java.util.List;
 
+/**
+ * InventoryController is a thin HTTP routing layer.
+ * All business logic lives in InventoryService, ProductCreationService and UserService.
+ */
 @RestController
 @RequestMapping("/api/seller/inventory")
-@CrossOrigin(origins = "*")
+@RequiredArgsConstructor
 public class InventoryController {
 
-    private final ProductRepository productRepository;
-    private final VehicleRepository vehicleRepository;
-
-    // A folder on your computer to save the uploaded product photos
-    private static final String UPLOAD_DIR = "src/main/resources/static/uploads/";
-
-    public InventoryController(ProductRepository productRepository, VehicleRepository vehicleRepository) {
-        this.productRepository = productRepository;
-        this.vehicleRepository = vehicleRepository;
-    }
+    private final InventoryService inventoryService;
+    private final ProductCreationService productCreationService;
+    private final UserService userService;
 
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<?> addProductWithImageAndFitment(
-            @RequestParam("image") MultipartFile image,
-            @RequestParam(value = "guide", required = false)MultipartFile guide,
+            Principal principal,
+            @RequestParam("images") List<MultipartFile> images,
+            @RequestParam(value = "guide", required = false) MultipartFile guide,
             @RequestParam("sku") String sku,
             @RequestParam("brand") String brand,
             @RequestParam("partName") String partName,
@@ -44,53 +42,74 @@ public class InventoryController {
             @RequestParam("description") String description,
             @RequestParam("stockQuantity") Integer stockQuantity,
             @RequestParam(value = "color", required = false) String color,
-            @RequestParam("vehicleIds") List<Long> vehicleIds) {
+            @RequestParam("condition") String condition,
+            @RequestParam("fitmentCategory") String fitmentCategory,
+            @RequestParam(value = "vehicleIds", required = false) List<Long> vehicleIds) {
 
-        try {
-            // 1. Save the Image File
-            File directory = new File(UPLOAD_DIR);
-            if (!directory.exists()) directory.mkdirs();
+        User seller = userService.getCurrentUser(principal.getName());
+        productCreationService.addProduct(seller, images, guide, sku, brand, partName,
+                category, price, description, stockQuantity, color,
+                condition, fitmentCategory, vehicleIds != null ? vehicleIds : java.util.Collections.emptyList());
+        return ResponseEntity.ok("Product and Guide saved successfully!");
+    }
 
-            String fileName = System.currentTimeMillis() + "_" + image.getOriginalFilename();
-            Path filePath = Paths.get(UPLOAD_DIR + fileName);
-            Files.write(filePath, image.getBytes());
+    @PostMapping("/base64")
+    public ResponseEntity<?> addProductBase64(
+            Principal principal,
+            @RequestBody Base64ProductRequest request) {
+        
+        User seller = userService.getCurrentUser(principal.getName());
+        productCreationService.addProductBase64(seller, request);
+        return ResponseEntity.ok("Product listed successfully via Base64!");
+    }
 
-            // 2. Fetch Compatible Vehicles
-            List<Vehicle> compatibleVehicles = vehicleRepository.findAllById(vehicleIds);
-            String guideUrl = null;
-            if (guide != null && !guide.isEmpty()) {
-                String guideName = System.currentTimeMillis() + "_" + guide.getOriginalFilename();
-                Path guidePath = Paths.get("src/main/resources/static/guides/" + guideName);
+    @PutMapping("/{id}/base64")
+    public ResponseEntity<?> updateProductBase64(
+            Principal principal,
+            @PathVariable Long id,
+            @RequestBody Base64ProductRequest request) {
+        
+        User seller = userService.getCurrentUser(principal.getName());
+        productCreationService.updateProductBase64(seller, id, request);
+        return ResponseEntity.ok("Product updated successfully via Base64!");
+    }
 
-                // Create guides folder if it doesn't exist
-                File guideDir = new File("src/main/resources/static/guides/");
-                if (!guideDir.exists()) guideDir.mkdirs();
+    @GetMapping("/analytics")
+    public ResponseEntity<SellerAnalyticsResponse> getSellerAnalytics(Principal principal) {
+        User seller = userService.getCurrentUser(principal.getName());
+        return ResponseEntity.ok(inventoryService.getSellerAnalytics(seller));
+    }
 
-                Files.write(guidePath, guide.getBytes());
-                guideUrl = "/guides/" + guideName;
-            }
+    @GetMapping
+    public ResponseEntity<List<ProductResponse>> getSellerInventory(Principal principal) {
+        User seller = userService.getCurrentUser(principal.getName());
+        return ResponseEntity.ok(inventoryService.getSellerProducts(seller));
+    }
 
-            // 3. Create and Save the Product using the Lombok Builder
-            Product newProduct = Product.builder()
-                    .sku(sku)
-                    .brand(brand)
-                    .partName(partName)
-                    .category(category)
-                    .price(price)
-                    .description(description)
-                    .color(color)
-                    .stockQuantity(stockQuantity)
-                    .imageUrl("/uploads/" + fileName)
-                    .installationGuideUrl(guideUrl)
-                    .fittedVehicles(new HashSet<>(compatibleVehicles))
-                    .build();
-
-            productRepository.save(newProduct);
-
-            return ResponseEntity.ok("Product and Guide saved successfully!");
-
-        } catch (IOException e) {
-            return ResponseEntity.internalServerError().body("File upload failed.");
+    /**
+     * DELETE /api/seller/inventory/{id}
+     * Sellers can only delete their OWN products.
+     * Returns 403 if the product belongs to a different seller.
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteSellerProduct(@PathVariable Long id, Principal principal) {
+        User seller = userService.getCurrentUser(principal.getName());
+        boolean deleted = productCreationService.deleteSellerProduct(seller, id);
+        if (!deleted) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("You are not allowed to delete this product.");
         }
+        return ResponseEntity.ok("Product deleted successfully.");
+    }
+
+    @PutMapping("/{id}/respond")
+    public ResponseEntity<?> respondToFlag(@PathVariable Long id, Principal principal, @RequestBody java.util.Map<String, String> body) {
+        User seller = userService.getCurrentUser(principal.getName());
+        String response = body.get("response");
+        boolean success = productCreationService.addSellerResponse(seller, id, response);
+        if (!success) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized to respond to this product.");
+        }
+        return ResponseEntity.ok("Response recorded and sent to the administration.");
     }
 }

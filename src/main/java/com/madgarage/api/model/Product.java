@@ -6,10 +6,15 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import com.madgarage.api.enums.FitmentCategory;
+import com.madgarage.api.enums.PartCondition;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import lombok.ToString;
 
 @Getter
 @Setter
@@ -17,7 +22,11 @@ import java.util.Set;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "products")
+// ARCH-05 FIX: Added indexes on frequently queried columns to prevent full table scans
+@Table(name = "products", indexes = {
+    @Index(name = "idx_product_seller", columnList = "seller_id"),
+    @Index(name = "idx_product_fitment", columnList = "fitment_category")
+})
 public class Product {
 
     @Id
@@ -31,7 +40,7 @@ public class Product {
     private String partName;
 
     private String category; // e.g., "Brakes", "Filters"
-    private Double price;    // e.g., 1250.00
+    private Double price; // e.g., 1250.00
 
     @Column(length = 1000) // Allows for longer descriptions
     private String description;
@@ -40,15 +49,37 @@ public class Product {
     private String color;
     private Integer stockQuantity;
     private String installationGuideUrl; // Path to the PDF file (e.g., /guides/brake_install.pdf)
+    
+    @Builder.Default
+    private boolean flagged = false;
+
+    @Column(length = 1000)
+    private String flagReason;
+
+    @Column(length = 1000)
+    private String sellerResponse;
+
+    @Enumerated(EnumType.STRING)
+    private FitmentCategory fitmentCategory;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "part_condition")
+    private PartCondition condition;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seller_id")
+    @JsonIgnore
+    private User seller;
 
     @ManyToMany
     @JsonIgnore
-    @JoinTable(
-            name = "product_fitment",
-            joinColumns = @JoinColumn(name = "product_id"),
-            inverseJoinColumns = @JoinColumn(name = "vehicle_id")
-    )
+    @JoinTable(name = "product_fitment", joinColumns = @JoinColumn(name = "product_id"), inverseJoinColumns = @JoinColumn(name = "vehicle_id"))
 
     @Builder.Default // Prevents Lombok Builder from overriding this with null
     private Set<Vehicle> fittedVehicles = new HashSet<>();
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    @ToString.Exclude
+    private List<ProductImage> images = new ArrayList<>();
 }

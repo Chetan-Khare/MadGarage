@@ -15,4 +15,11 @@ public class MadGarageApiApplication {
 	public ObjectMapper objectMapper() {
 		return new ObjectMapper();
 	}
+
+	@Bean
+	public jakarta.servlet.MultipartConfigElement multipartConfigElement() {
+		// Programmatic override for upload limits (100MB file / 500MB request)
+		// This explicitly sets the limits at the Servlet level.
+		return new jakarta.servlet.MultipartConfigElement("", 104857600L, 524288000L, 0);
+	}
 }

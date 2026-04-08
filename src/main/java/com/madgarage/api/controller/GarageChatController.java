@@ -16,6 +16,11 @@ public class GarageChatController {
         this.assistantService = assistantService;
     }
 
+    @GetMapping("/test")
+    public ResponseEntity<String> testConnection() {
+        return ResponseEntity.ok("Mad Garage API is REACHABLE! 🏎️");
+    }
+
     @PostMapping("/chat")
     public ResponseEntity<AssistantResult> chat(
             @RequestParam(value = "message", required = false) String message,

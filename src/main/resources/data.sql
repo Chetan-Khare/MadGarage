@@ -1,0 +1,2 @@
+-- Seed data moved to src/main/resources/db/migration/V2__seed_data.sql
+-- This file is kept empty to avoid double-initialization issues in Spring Boot 3.

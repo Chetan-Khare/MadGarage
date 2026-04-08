@@ -1,123 +1,104 @@
 package com.madgarage.api.controller;
 
 import com.madgarage.api.dto.AdminAnalyticsResponse;
-import com.madgarage.api.enums.Role;
-import com.madgarage.api.model.Order;
-import com.madgarage.api.model.User;
-import com.madgarage.api.repository.OrderRepository;
-import com.madgarage.api.repository.UserRepository;
+import com.madgarage.api.dto.B2BUserRequest;
+import com.madgarage.api.dto.OrderResponse;
+import com.madgarage.api.dto.ProductResponse;
+import com.madgarage.api.dto.UserProfileResponse;
+import com.madgarage.api.services.OrderService;
+import com.madgarage.api.services.ProductService;
+import com.madgarage.api.services.UserService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Arrays;
 import java.util.List;
 
+/**
+ * AdminController is a thin HTTP routing layer.
+ * All business logic lives in UserService, OrderService, and ProductService.
+ */
 @RestController
 @RequestMapping("/api/admin")
-@PreAuthorize("hasAuthority('ADMIN')")
-@CrossOrigin(origins = "*")
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
-    private final UserRepository userRepository;
-    private final OrderRepository orderRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final UserService userService;
+    private final OrderService orderService;
+    private final ProductService productService;
 
-    public AdminController(UserRepository userRepository, OrderRepository orderRepository,
-            PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.orderRepository = orderRepository;
-        this.passwordEncoder = passwordEncoder;
+    public AdminController(UserService userService, OrderService orderService, ProductService productService) {
+        this.userService = userService;
+        this.orderService = orderService;
+        this.productService = productService;
     }
 
     @GetMapping("/analytics")
     public ResponseEntity<AdminAnalyticsResponse> getAnalytics() {
-        long totalUsers = userRepository.count();
-        long totalSellers = userRepository.countByRole(Role.SELLER);
-
-        // Sum the totalAmount of all orders in the database
-        double totalRevenue = orderRepository.findAll().stream()
-                .mapToDouble(Order::getTotalAmount)
-                .sum();
-
-        // In a real app we would write a SQL query GROUP BY MONTH(createdAt).
-        // For now, we will provide a mocked array simulating real growth for the chart:
-        List<Double> sixMonthRevenue = Arrays.asList(
-                totalRevenue * 0.1, // 6 months ago
-                totalRevenue * 0.15, // 5 months ago
-                totalRevenue * 0.2, // 4 months ago
-                totalRevenue * 0.35, // 3 months ago
-                totalRevenue * 0.6, // 2 months ago
-                totalRevenue // This month
-        );
-
-        AdminAnalyticsResponse response = new AdminAnalyticsResponse(
-                totalUsers,
-                totalSellers,
-                totalRevenue,
-                sixMonthRevenue);
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(userService.getAdminAnalytics());
     }
 
     @PostMapping("/users")
-    public ResponseEntity<?> createB2BUser(@RequestBody B2BUserRequest request) {
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            return ResponseEntity.badRequest().body("Email is already registered!");
-        }
-
-        // Only allow creating Garage or Seller users from the Admin dashboard
-        Role newRole;
-        try {
-            newRole = Role.valueOf(request.getRole().toUpperCase());
-            if (newRole != Role.SELLER && newRole != Role.GARAGE) {
-                throw new IllegalArgumentException();
-            }
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("Invalid Role. Must be SELLER or GARAGE");
-        }
-
-        User newUser = User.builder()
-                .firstName(request.getFirstName())
-                .lastName(request.getLastName())
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .role(newRole)
-                .isActive(true)
-                .build();
-
-        userRepository.save(newUser);
-
+    public ResponseEntity<?> createB2BUser(@Valid @RequestBody B2BUserRequest request) {
+        userService.createB2BUser(request);
         return ResponseEntity.ok(request.getRole() + " Account created successfully!");
     }
-}
 
-class B2BUserRequest {
-    private String firstName;
-    private String lastName;
-    private String email;
-    private String password;
-    private String role;
-
-    // Getters
-    public String getFirstName() {
-        return firstName;
+    @GetMapping("/users")
+    public ResponseEntity<List<UserProfileResponse>> getAllUsers() {
+        return ResponseEntity.ok(userService.getAllUsersProfileResponses());
     }
 
-    public String getLastName() {
-        return lastName;
+    @DeleteMapping("/users/{id}")
+    public ResponseEntity<?> deactivateUser(@PathVariable Long id) {
+        userService.deleteUser(id);
+        return ResponseEntity.ok("User successfully deactivated/banned.");
     }
 
-    public String getEmail() {
-        return email;
+    @GetMapping("/orders")
+    public ResponseEntity<List<OrderResponse>> getAllOrders() {
+        return ResponseEntity.ok(orderService.getAllOrdersAsDto());
     }
 
-    public String getPassword() {
-        return password;
+    @PutMapping("/orders/{id}/status")
+    public ResponseEntity<OrderResponse> updateOrderStatus(@PathVariable Long id,
+            @RequestBody java.util.Map<String, String> body) {
+        String newStatus = body.get("status");
+        if (newStatus == null || newStatus.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(orderService.updateOrderStatus(id, newStatus));
     }
 
-    public String getRole() {
-        return role;
+    @DeleteMapping("/orders/{id}")
+    public ResponseEntity<?> deleteOrder(@PathVariable Long id) {
+        orderService.deleteOrder(id);
+        return ResponseEntity.ok("Order successfully deleted.");
+    }
+
+    @GetMapping("/inventory")
+    public ResponseEntity<List<ProductResponse>> getInventory() {
+        return ResponseEntity.ok(productService.getAllProductsAsDto());
+    }
+
+    @PutMapping("/inventory/{id}")
+    public ResponseEntity<?> updateProduct(@PathVariable Long id,
+            @Valid @RequestBody com.madgarage.api.dto.ProductRequest request) {
+        productService.updateProduct(id, request);
+        return ResponseEntity.ok("Product updated successfully!");
+    }
+
+    @DeleteMapping("/inventory/{id}")
+    public ResponseEntity<?> deleteProduct(@PathVariable Long id) {
+        productService.deleteProduct(id);
+        return ResponseEntity.ok("Product deleted successfully!");
+    }
+
+    @PutMapping("/inventory/{id}/toggle-flag")
+    public ResponseEntity<?> toggleProductFlag(@PathVariable Long id, @RequestBody(required = false) java.util.Map<String, String> body) {
+        String reason = (body != null) ? body.get("reason") : null;
+        boolean newState = productService.toggleProductFlag(id, reason);
+        return ResponseEntity.ok("Product " + (newState ? "flagged" : "unflagged") + " successfully!");
     }
 }

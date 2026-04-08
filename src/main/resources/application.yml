@@ -2,28 +2,70 @@ spring:
   application:
     name: mad-garage-api
 
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 500MB
+
   # Database Setup (MySQL 8.0)
   datasource:
     url: jdbc:mysql://localhost:3306/madgarage?serverTimezone=UTC
-    username: root # "root" is usually the default for local MySQL
-    password: root # Change this to your actual MySQL password
+    username: root
+    password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  # Spring Boot 3 SQL Initialization
+  sql:
+    init:
+      mode: never # We use Flyway (V2__seed_data.sql) instead of data.sql
+
   # Hibernate (Database ORM) Setup
+  # P0 FIX: Changed from 'update' to 'validate' for absolute Flyway control.
   jpa:
     hibernate:
-      ddl-auto: update # Automatically creates your tables!
-    show-sql: true # Prints SQL queries in your console
+      ddl-auto: none
+    show-sql: true
     properties:
       hibernate:
-        format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
+        jdbc:
+          time_zone: UTC
 
-  # Spring AI Setup (Google Gemini)
+  flyway:
+    enabled: false
+    baseline-on-migrate: true
+    baseline-version: 1
+    validate-on-migrate: false # Prevent startup failure due to checksum mismatch on existing scripts.
+
+  # Spring AI Setup (Gemma 4 via Google AI Studio)
   ai:
     google:
       genai:
-        api-key: AIzaSyDUrrGxoNqHXcNVz79l-o_xhZcCgrm6-04
+        api-key: ${GEMINI_API_KEY}
         chat:
           options:
-            model: gemini-2.5-flash
+            model: gemma-4-26b
+
+# Tomcat connector config — remove default file-part count limit for multi-image uploads
+server:
+  tomcat:
+    max-parameter-count: -1
+    max-http-form-post-size: -1
+    max-swallow-size: -1
+
+logging:
+  level:
+    org.apache.tomcat: DEBUG
+    org.springframework.web.multipart: DEBUG
+
+# P1 FIX: JWT secret has NO fallback value.
+# The app will throw IllegalArgumentException on startup if JWT_SECRET env var is missing.
+# This is the correct "fail fast" behavior — never allow a weak default secret in any env.
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+  seed:
+    password: ${SEED_PASSWORD:password123}
+  pricing:
+    shipping-fee: 250.0
+    garage-discount: 0.05

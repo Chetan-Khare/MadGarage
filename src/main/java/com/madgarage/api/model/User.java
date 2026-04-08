@@ -13,7 +13,10 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "users") // "user" is a reserved keyword in some SQL dialects, so "users" is safer
+// ARCH-05 FIX: Added index on phone — used on every OTP login (was a full table scan before)
+@Table(name = "users", indexes = {
+    @Index(name = "idx_user_phone", columnList = "phone")
+})
 public class User {
 
     @Id
@@ -26,18 +29,26 @@ public class User {
     @Column(nullable = false)
     private String lastName;
 
-    @Column(nullable = false, unique = true)
+    @Column(unique = true)
     private String email;
 
-    @Column(nullable = false)
     private String password;
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Role role; // This handles ADMIN, SELLER, or CUSTOMER
+    private Role role; // This handles ROLE_ADMIN, ROLE_SELLER, or ROLE_CUSTOMER
 
+    @Builder.Default
     @Column(nullable = false)
     private boolean isActive = true;
+
+    @Column(unique = true)
+    private String phone;
+    
+    @Column(name = "profile_image_url")
+    private String profileImageUrl;
+
+    @Column(name = "expo_push_token")
+    private String expoPushToken;
 
     @CreationTimestamp
     @Column(updatable = false)

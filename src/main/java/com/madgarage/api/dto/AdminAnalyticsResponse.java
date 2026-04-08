@@ -10,6 +10,8 @@ import java.util.List;
 public class AdminAnalyticsResponse {
     private long totalUsers;
     private long totalSellers;
+    private long totalProducts;
+    private long totalVehicles;
     private double totalRevenue;
     private List<Double> sixMonthRevenue;
 }

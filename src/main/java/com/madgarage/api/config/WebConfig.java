@@ -12,13 +12,27 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // Expose the "src/main/resources/static/uploads/" folder to the "/uploads/**" URL path
-        Path uploadDir = Paths.get("src/main/resources/static/uploads/");
-        String uploadPath = uploadDir.toFile().getAbsolutePath();
+        String projectRoot = System.getProperty("user.dir");
 
+        // Expose the "uploads" folder
+        String uploadPath = Paths.get(projectRoot, "src/main/resources/static/uploads/")
+                .toAbsolutePath().normalize().toUri().toString();
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:/" + uploadPath + "/");
+                .addResourceLocations(uploadPath);
+
+        // Expose the "guides" folder
+        String guidesPath = Paths.get(projectRoot, "src/main/resources/static/guides/")
+                .toAbsolutePath().normalize().toUri().toString();
         registry.addResourceHandler("/guides/**")
-                .addResourceLocations("file:src/main/resources/static/guides/");
+                .addResourceLocations(guidesPath);
+    }
+
+    @Override
+    public void addCorsMappings(org.springframework.web.servlet.config.annotation.CorsRegistry registry) {
+        registry.addMapping("/**")
+                .allowedOrigins("*")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders("*")
+                .exposedHeaders("Authorization");
     }
 }
