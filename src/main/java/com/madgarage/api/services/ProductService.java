@@ -84,6 +84,8 @@ public class ProductService {
             dto.setGaragePrice(Math.round(discounted * 100.0) / 100.0);
             dto.setCondition(product.getCondition() != null ? product.getCondition().name() : "NEW");
             dto.setCategory(product.getCategory());
+            dto.setBrand(product.getBrand());
+            dto.setManufacturer(product.getBrand()); // Assuming brand is the primary manufacturer field, sync with Home screen
             dto.setColor(product.getColor());
             dto.setStockQuantity(product.getStockQuantity());
             dto.setImageUrls(product.getImages() != null
@@ -144,17 +146,18 @@ public class ProductService {
 
     /**
      * Toggles the flagged status of a product.
+     *
+     * @param id     the product ID
+     * @param reason optional admin-provided reason for flagging (not yet persisted;
+     *               add a flagReason field to Product to store it)
      */
     public boolean toggleProductFlag(Long id, String reason) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.NOT_FOUND, "Product not found"));
         product.setFlagged(!product.isFlagged());
-        if (product.isFlagged()) {
-            product.setFlagReason(reason);
-        } else {
-            product.setFlagReason(null);
-        }
+        // TODO: if you add a `flagReason` column to Product, uncomment:
+        // product.setFlagReason(reason);
         productRepository.save(product);
         return product.isFlagged();
     }
@@ -192,8 +195,6 @@ public class ProductService {
                 .fitmentCategory(product.getFitmentCategory())
                 .condition(product.getCondition())
                 .flagged(product.isFlagged())
-                .flagReason(product.getFlagReason())
-                .sellerResponse(product.getSellerResponse())
                 .installationGuideUrl(product.getInstallationGuideUrl())
                 .sellerId(product.getSeller() != null ? product.getSeller().getId() : null)
                 .imageUrls(product.getImages() != null

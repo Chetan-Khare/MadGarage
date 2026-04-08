@@ -12,6 +12,8 @@ public class GarageProductDTO {
     private String condition;
     private String color;
     private String category;
+    private String brand;
+    private String manufacturer;
     private Integer stockQuantity;
     private List<String> imageUrls;
 }
