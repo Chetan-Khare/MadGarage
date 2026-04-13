@@ -45,6 +45,18 @@ public class AdminController {
         return ResponseEntity.ok(request.getRole() + " Account created successfully!");
     }
 
+    @PostMapping("/users/{id}/restore")
+    public ResponseEntity<String> restoreUser(@PathVariable Long id) {
+        userService.restoreUser(id);
+        return ResponseEntity.ok("Account successfully restored to active status.");
+    }
+
+    @PutMapping("/users/{id}")
+    public ResponseEntity<?> updateUser(@PathVariable Long id, @Valid @RequestBody B2BUserRequest request) {
+        userService.updateUserByAdmin(id, request);
+        return ResponseEntity.ok("User record updated successfully!");
+    }
+
     @GetMapping("/users")
     public ResponseEntity<List<UserProfileResponse>> getAllUsers() {
         return ResponseEntity.ok(userService.getAllUsersProfileResponses());

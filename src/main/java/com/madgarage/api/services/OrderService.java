@@ -45,10 +45,6 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
-    public OrderResponse mapToOrderResponse(Order order) {
-        return mapToOrderResponse(order, null);
-    }
-
     public OrderResponse mapToOrderResponse(Order order, User requester) {
         boolean isSeller = requester != null && requester.getRole() == com.madgarage.api.enums.Role.ROLE_SELLER;
 
@@ -133,6 +129,10 @@ public class OrderService {
         List<OrderItem> orderItems = new ArrayList<>();
 
         for (OrderRequest.CartItemDto itemDto : request.getItems()) {
+            if (itemDto.getQuantity() == null || itemDto.getQuantity() < 1) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid quantity.");
+            }
+
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found: " + itemDto.getProductId()));
 
@@ -191,7 +191,7 @@ public class OrderService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found."));
         order.setStatus(newStatus.toUpperCase());
         orderRepository.save(order);
-        return mapToOrderResponse(order);
+        return mapToOrderResponse(order, order.getUser());
     }
 
     @Transactional

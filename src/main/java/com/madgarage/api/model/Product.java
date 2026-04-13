@@ -51,6 +51,10 @@ public class Product {
     private String installationGuideUrl; // Path to the PDF file (e.g., /guides/brake_install.pdf)
     
     @Builder.Default
+    private boolean manualRatingOverride = false;
+    private Double manualRating;
+    
+    @Builder.Default
     private boolean flagged = false;
 
     @Column(length = 1000)

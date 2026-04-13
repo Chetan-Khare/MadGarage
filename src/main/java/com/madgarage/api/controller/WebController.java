@@ -33,16 +33,4 @@ public class WebController {
         return "catalog";
     }
 
-    @GetMapping("/receipt/{id}")
-    public String receipt(@PathVariable Long id, Model model) {
-        // We'll use a simplified version for the web or the same DTO
-        // Note: For public receipts, we might need a non-authenticated endpoint or a token
-        try {
-            OrderResponse order = orderService.mapToOrderResponse(null, null); // Mocked for now
-            model.addAttribute("order", order);
-        } catch (Exception e) {
-            return "error";
-        }
-        return "receipt";
-    }
 }

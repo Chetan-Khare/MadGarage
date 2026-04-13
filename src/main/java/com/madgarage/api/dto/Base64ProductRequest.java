@@ -24,4 +24,8 @@ public class Base64ProductRequest {
     private String base64Guide;
     private String guideExtension;
     private Boolean flagged;
+    private String sellerResponse;
+    private Boolean isManualRating;
+    private Double rating;
+    private String flagReason;
 }

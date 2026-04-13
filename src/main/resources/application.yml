@@ -32,7 +32,7 @@ spring:
           time_zone: UTC
 
   flyway:
-    enabled: false
+    enabled: true
     baseline-on-migrate: true
     baseline-version: 1
     validate-on-migrate: false # Prevent startup failure due to checksum mismatch on existing scripts.
@@ -41,7 +41,7 @@ spring:
   ai:
     google:
       genai:
-        api-key: ${GEMINI_API_KEY}
+        api-key: ${GEMINI_API_KEY:DISABLED} # FALLBACK IF NO KEY IS PROVIDED
         chat:
           options:
             model: gemma-4-26b
@@ -63,9 +63,11 @@ logging:
 # This is the correct "fail fast" behavior — never allow a weak default secret in any env.
 app:
   jwt:
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET} # SECURE: Will crash on startup if missing, preventing default secret attacks
   seed:
     password: ${SEED_PASSWORD:password123}
   pricing:
     shipping-fee: 250.0
     garage-discount: 0.05
+
+# END OF FILE

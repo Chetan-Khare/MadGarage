@@ -27,12 +27,5 @@ public class WebConfig implements WebMvcConfigurer {
                 .addResourceLocations(guidesPath);
     }
 
-    @Override
-    public void addCorsMappings(org.springframework.web.servlet.config.annotation.CorsRegistry registry) {
-        registry.addMapping("/**")
-                .allowedOrigins("*")
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                .allowedHeaders("*")
-                .exposedHeaders("Authorization");
-    }
+    // CORS configuration is handled entirely by SecurityConfig
 }

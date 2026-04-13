@@ -44,11 +44,14 @@ public class GarageAssistantService {
         // ── Fast-path: conversational greetings → no AI/DB call needed ─────────
         if (isGreeting(text)) {
             return new AssistantResult(
-                "Hey there! 👋 I'm your Virtual Mechanic at Mad Garage!\n\n" +
-                "I can help you find the right parts for your vehicle. Just tell me:\n" +
-                "• Your vehicle's **Year, Make & Model** (e.g. \"2019 Hyundai Creta\")\n" +
-                "• What part you're looking for (e.g. brake pads, air filter)\n\n" +
-                "Or upload a photo of the part or damage and I'll take a look! 🔧",
+                    """
+                            Hey there! 👋 I'm your Virtual Mechanic at Mad Garage!
+
+                            I can help you find the right parts for your vehicle. Just tell me:
+                            • Your vehicle's **Year, Make & Model** (e.g. "2019 Hyundai i10")
+                            • What part you're looking for (e.g. brake pads, air filter)
+
+                            Or upload a photo of the part or damage and I'll take a look! 🔧""",
                 new ArrayList<>(),
                 false
             );

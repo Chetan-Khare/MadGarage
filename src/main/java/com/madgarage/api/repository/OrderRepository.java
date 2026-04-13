@@ -31,8 +31,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            "ORDER BY o.id DESC")
     List<Order> findByUserWithItems(@Param("user") User user);
 
-    List<Order> findByUser(User user);
-
     @Query("SELECT SUM(oi.priceAtPurchase * oi.quantity) FROM OrderItem oi " +
            "WHERE oi.product.seller = :seller")
     Double calculateRevenueBySeller(@Param("seller") User seller);

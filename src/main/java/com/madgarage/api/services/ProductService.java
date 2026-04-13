@@ -27,28 +27,33 @@ public class ProductService {
     // Queries
     // -----------------------------------------------------------------------
 
-    /**
-     * Returns all products, optionally filtered by fitment category.
-     */
-    public List<ProductResponse> getAllProducts(String category, Long vehicleId) {
-        List<Product> products;
+    private List<Product> fetchFilteredProducts(String category, Long vehicleId) {
         if (vehicleId != null) {
             if (category != null && !category.isEmpty()) {
-                products = productRepository.findByCategoryAndFittedVehiclesId(category, vehicleId);
+                return productRepository.findByCategoryAndFittedVehiclesId(category, vehicleId);
             } else {
-                products = productRepository.findByFittedVehiclesId(vehicleId);
+                return productRepository.findByFittedVehiclesId(vehicleId);
             }
         } else if (category != null && !category.isEmpty()) {
             try {
                 FitmentCategory fitment = FitmentCategory.valueOf(category.toUpperCase());
-                products = productRepository.findByFitmentCategory(fitment);
+                return productRepository.findByFitmentCategory(fitment);
             } catch (IllegalArgumentException e) {
-                products = productRepository.findAll();
+                return productRepository.findAll();
             }
         } else {
-            products = productRepository.findAll();
+            return productRepository.findAll();
         }
-        return products.stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    /**
+     * Returns all products, optionally filtered by fitment category.
+     */
+    public List<ProductResponse> getAllProducts(String category, Long vehicleId) {
+        return fetchFilteredProducts(category, vehicleId).stream()
+                .filter(product -> !product.isFlagged())
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -56,25 +61,9 @@ public class ProductService {
      * filtered by category.
      */
     public List<GarageProductDTO> getGarageProducts(String category, Long vehicleId) {
-        List<Product> products;
-        if (vehicleId != null) {
-            if (category != null && !category.isEmpty()) {
-                products = productRepository.findByCategoryAndFittedVehiclesId(category, vehicleId);
-            } else {
-                products = productRepository.findByFittedVehiclesId(vehicleId);
-            }
-        } else if (category != null && !category.isEmpty()) {
-            try {
-                FitmentCategory fitment = FitmentCategory.valueOf(category.toUpperCase());
-                products = productRepository.findByFitmentCategory(fitment);
-            } catch (IllegalArgumentException e) {
-                products = productRepository.findAll();
-            }
-        } else {
-            products = productRepository.findAll();
-        }
-
-        return products.stream().map(product -> {
+        return fetchFilteredProducts(category, vehicleId).stream()
+                .filter(product -> !product.isFlagged())
+                .map(product -> {
             GarageProductDTO dto = new GarageProductDTO();
             dto.setId(product.getId());
             dto.setName(product.getPartName());
@@ -85,12 +74,12 @@ public class ProductService {
             dto.setCondition(product.getCondition() != null ? product.getCondition().name() : "NEW");
             dto.setCategory(product.getCategory());
             dto.setBrand(product.getBrand());
-            dto.setManufacturer(product.getBrand()); // Assuming brand is the primary manufacturer field, sync with Home screen
             dto.setColor(product.getColor());
             dto.setStockQuantity(product.getStockQuantity());
             dto.setImageUrls(product.getImages() != null
                     ? product.getImages().stream().map(ProductImage::getImageUrl).collect(Collectors.toList())
                     : java.util.Collections.emptyList());
+            dto.setRating(product.isManualRatingOverride() ? product.getManualRating() : 4.8);
             return dto;
         }).collect(Collectors.toList());
     }
@@ -141,6 +130,13 @@ public class ProductService {
         if (request.getInstallationGuideUrl() != null)
             product.setInstallationGuideUrl(request.getInstallationGuideUrl());
 
+        product.setManualRatingOverride(request.isManualRating());
+        product.setManualRating(request.getRating());
+        
+        if (request.getFlagged() != null) product.setFlagged(request.getFlagged());
+        if (request.getFlagReason() != null) product.setFlagReason(request.getFlagReason());
+        if (request.getSellerResponse() != null) product.setSellerResponse(request.getSellerResponse());
+
         productRepository.save(product);
     }
 
@@ -156,8 +152,7 @@ public class ProductService {
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.NOT_FOUND, "Product not found"));
         product.setFlagged(!product.isFlagged());
-        // TODO: if you add a `flagReason` column to Product, uncomment:
-        // product.setFlagReason(reason);
+        product.setFlagReason(reason);
         productRepository.save(product);
         return product.isFlagged();
     }
@@ -195,11 +190,15 @@ public class ProductService {
                 .fitmentCategory(product.getFitmentCategory())
                 .condition(product.getCondition())
                 .flagged(product.isFlagged())
+                .flagReason(product.getFlagReason())
+                .sellerResponse(product.getSellerResponse())
                 .installationGuideUrl(product.getInstallationGuideUrl())
                 .sellerId(product.getSeller() != null ? product.getSeller().getId() : null)
                 .imageUrls(product.getImages() != null
                         ? product.getImages().stream().map(ProductImage::getImageUrl).collect(Collectors.toList())
                         : java.util.Collections.emptyList())
+                .isManualRating(product.isManualRatingOverride())
+                .rating(product.isManualRatingOverride() ? product.getManualRating() : 4.8)
                 .build();
     }
 }

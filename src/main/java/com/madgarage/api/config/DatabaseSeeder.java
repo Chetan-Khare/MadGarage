@@ -12,7 +12,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.beans.factory.annotation.Value;
 import javax.sql.DataSource;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+
 @Configuration
+@ConditionalOnProperty(name = "app.seeder.enabled", havingValue = "true")
 public class DatabaseSeeder {
 
     @Value("${app.seed.password}")

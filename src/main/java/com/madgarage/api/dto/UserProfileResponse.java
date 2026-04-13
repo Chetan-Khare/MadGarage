@@ -13,4 +13,5 @@ public class UserProfileResponse {
     private String phone;
     private String role;
     private String profileImageUrl;
+    private boolean active;
 }

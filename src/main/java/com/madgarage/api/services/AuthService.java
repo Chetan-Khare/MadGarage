@@ -10,6 +10,8 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -23,6 +25,8 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -52,6 +56,9 @@ public class AuthService {
         User user;
         if (userOptional.isPresent()) {
             user = userOptional.get();
+            if (!user.isActive()) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This account has been deactivated. Access denied.");
+            }
         } else {
             // Auto-create new Customer account for unrecognised phone numbers
             String randomPassword = java.util.UUID.randomUUID().toString();
@@ -101,27 +108,32 @@ public class AuthService {
      */
     public AuthResponse login(LoginRequest request) {
         String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
-        System.out.println("[DEBUG] Login attempt for: [" + email + "]");
+        log.debug("Login attempt for: [{}]", email);
         
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(email, request.getPassword())
             );
         } catch (AuthenticationException e) {
-            System.out.println("[DEBUG] Authentication failed for: [" + email + "] | Reason: " + e.getMessage());
+            log.debug("Authentication failed for: [{}] | Reason: {}", email, e.getMessage());
             // Check if user even exists in DB
             boolean exists = userRepository.findByEmail(email).isPresent();
-            System.out.println("[DEBUG] Does user exist in DB? " + exists);
+            log.debug("Does user exist in DB? {}", exists);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password.");
         }
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> {
-                    System.out.println("[DEBUG] CRITICAL: User authenticated but not found in DB: [" + email + "]");
+                    log.error("CRITICAL: User authenticated but not found in DB: [{}]", email);
                     return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password.");
                 });
 
-        System.out.println("[DEBUG] Login successful for: [" + email + "] | Role: " + user.getRole());
+        if (!user.isActive()) {
+            log.warn("Login attempt for deactivated user: [{}]", email);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This account has been deactivated. Access denied.");
+        }
+
+        log.debug("Login successful for: [{}] | Role: {}", email, user.getRole());
         String token = jwtService.generateToken(user);
         return new AuthResponse(token, "Login successful!", user.getId(), user.getRole().name());
     }

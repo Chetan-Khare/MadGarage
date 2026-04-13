@@ -44,12 +44,4 @@ public class JwtService {
         return decodedJWT.getClaim("role").asString();
     }
 
-    // Checks if the token is valid and hasn't expired
-    public boolean isTokenValid(String token, String userEmail) {
-        String extractedEmail = extractEmail(token);
-        DecodedJWT decodedJWT = JWT.require(getAlgorithm()).build().verify(token);
-        boolean isExpired = decodedJWT.getExpiresAt().before(new Date());
-
-        return (extractedEmail.equals(userEmail) && !isExpired);
-    }
 }

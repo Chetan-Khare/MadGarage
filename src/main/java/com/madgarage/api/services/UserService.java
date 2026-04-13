@@ -33,9 +33,7 @@ public class UserService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final VehicleRepository vehicleRepository;
-    
-    // Improved Path handling: resolving relative to the current project root at runtime
-    private static final String UPLOAD_REL_PATH = "src/main/resources/static/uploads/";
+    private final FileStorageService fileStorageService;
 
     /**
      * Resolves the currently authenticated user by email.
@@ -68,6 +66,7 @@ public class UserService {
                 .phone(user.getPhone())
                 .role(user.getRole().name())
                 .profileImageUrl(user.getProfileImageUrl())
+                .active(user.isActive())
                 .build();
     }
 
@@ -107,31 +106,11 @@ public class UserService {
         }
 
         try {
-            // Robust absolute path resolution
-            Path basePath = Paths.get(UPLOAD_REL_PATH).toAbsolutePath().normalize();
-            File directory = basePath.toFile();
-            
-            if (!directory.exists()) {
-                if (!directory.mkdirs()) {
-                    throw new IOException("Could not create directory: " + basePath);
-                }
-            }
-
             String extension = contentType.split("/")[1].replaceAll("[^a-zA-Z0-9]", "");
-            String safeFileName = java.util.UUID.randomUUID() + "." + extension;
-            Path filePath = basePath.resolve(safeFileName).normalize();
-
-            if (!filePath.startsWith(basePath)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid file path.");
-            }
-
-            Files.write(filePath, image.getBytes());
-
-            String fileUrl = "/uploads/" + safeFileName;
+            String fileUrl = fileStorageService.saveImage(image.getBytes(), extension);
             user.setProfileImageUrl(fileUrl);
             userRepository.save(user);
             return fileUrl;
-
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to upload image: " + e.getMessage());
         }
@@ -149,16 +128,6 @@ public class UserService {
         }
 
         try {
-            Path basePath = Paths.get(UPLOAD_REL_PATH).toAbsolutePath().normalize();
-            File directory = basePath.toFile();
-            
-            if (!directory.exists()) {
-                if (!directory.mkdirs()) {
-                    throw new IOException("Could not create directory: " + basePath);
-                }
-            }
-
-            // Clean the base64 string if it contains data URI header
             String base64Data = request.getBase64Image();
             if (base64Data.contains(",")) {
                 base64Data = base64Data.split(",")[1];
@@ -166,21 +135,14 @@ public class UserService {
             
             byte[] imageBytes = java.util.Base64.getDecoder().decode(base64Data);
             
-            // Default to jpg if no extension is provided
             String extension = (request.getExtension() != null && !request.getExtension().isBlank()) 
                     ? request.getExtension().replaceAll("[^a-zA-Z0-9]", "") 
                     : "jpg";
                     
-            String safeFileName = java.util.UUID.randomUUID() + "." + extension;
-            Path filePath = basePath.resolve(safeFileName).normalize();
-
-            Files.write(filePath, imageBytes);
-
-            String fileUrl = "/uploads/" + safeFileName;
+            String fileUrl = fileStorageService.saveImage(imageBytes, extension);
             user.setProfileImageUrl(fileUrl);
             userRepository.save(user);
             return fileUrl;
-
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to upload image from Base64: " + e.getMessage());
         }
@@ -190,8 +152,12 @@ public class UserService {
      * Creates a new B2B user (SELLER or GARAGE role) for the admin dashboard.
      */
     public void createB2BUser(B2BUserRequest request) {
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        if (request.getEmail() != null && userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is already registered!");
+        }
+
+        if (request.getPhone() != null && !request.getPhone().isBlank() && userRepository.findByPhone(request.getPhone()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Phone number is already associated with another account!");
         }
 
         Role newRole;
@@ -205,7 +171,7 @@ public class UserService {
                 throw new IllegalArgumentException();
             }
         } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid Role. Must be SELLER or GARAGE.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid Role. Authorized roles are SELLER, GARAGE, or ADMIN.");
         }
 
         User newUser = User.builder()
@@ -222,11 +188,57 @@ public class UserService {
     }
 
     /**
+     * Updates an existing user's record from the Administrative control panel.
+     */
+    public void updateUserByAdmin(Long id, B2BUserRequest request) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
+
+        if (request.getFirstName() != null && !request.getFirstName().isBlank()) {
+            user.setFirstName(request.getFirstName());
+        }
+        if (request.getLastName() != null && !request.getLastName().isBlank()) {
+            user.setLastName(request.getLastName());
+        }
+        
+        // Handle Email unique constraint
+        if (request.getEmail() != null && !request.getEmail().equalsIgnoreCase(user.getEmail())) {
+            if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New email is already taken.");
+            }
+            user.setEmail(request.getEmail());
+        }
+
+        // Handle Phone unique constraint
+        if (request.getPhone() != null && !request.getPhone().equals(user.getPhone())) {
+            if (userRepository.findByPhone(request.getPhone()).isPresent()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New phone number is already taken.");
+            }
+            user.setPhone(request.getPhone());
+        }
+
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
+
+        if (request.getRole() != null) {
+            try {
+                String roleStr = request.getRole().toUpperCase();
+                if (!roleStr.startsWith("ROLE_")) roleStr = "ROLE_" + roleStr;
+                Role newRole = Role.valueOf(roleStr);
+                user.setRole(newRole);
+            } catch (Exception ignored) {}
+        }
+
+        userRepository.save(user);
+    }
+
+    /**
      * Aggregates platform-wide analytics for the Admin dashboard.
      */
     public AdminAnalyticsResponse getAdminAnalytics() {
-        long totalUsers = userRepository.count();
-        long totalSellers = userRepository.countByRole(Role.ROLE_SELLER);
+        long totalUsers = userRepository.countByIsActiveTrue();
+        long totalSellers = userRepository.countByRoleAndIsActiveTrue(Role.ROLE_SELLER);
         long totalProducts = productRepository.count();
         long totalVehicles = vehicleRepository.count();
 
@@ -253,7 +265,53 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
         
+        long timestamp = System.currentTimeMillis();
+        
+        // Scramble unique identifiers to free them up for new accounts
+        if (user.getEmail() != null) {
+            user.setEmail(user.getEmail() + "_DEACTIVATED_" + timestamp);
+        }
+        if (user.getPhone() != null) {
+            user.setPhone(user.getPhone() + "_DEACT_" + timestamp);
+        }
+        
         user.setActive(false);
+        userRepository.save(user);
+    }
+
+    /**
+     * Restores a deactivated user record to active status.
+     * Reverses the identifier scrambling and enables platform access.
+     */
+    public void restoreUser(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
+
+        if (user.isActive()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Operator is already active.");
+        }
+
+        // Restore Email
+        String originalEmail = user.getEmail();
+        if (originalEmail != null && originalEmail.contains("_DEACTIVATED_")) {
+            originalEmail = originalEmail.substring(0, originalEmail.indexOf("_DEACTIVATED_"));
+            if (userRepository.findByEmail(originalEmail).isPresent()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot restore: Email " + originalEmail + " is now claimed by another active user.");
+            }
+            user.setEmail(originalEmail);
+        }
+
+        // Restore Phone
+        String originalPhone = user.getPhone();
+        if (originalPhone != null && originalPhone.contains("_DEACT_")) {
+            originalPhone = originalPhone.substring(0, originalPhone.indexOf("_DEACT_"));
+            if (userRepository.findByPhone(originalPhone).isPresent()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot restore: Phone number is now claimed by another active user.");
+            }
+            user.setPhone(originalPhone);
+        }
+
+        user.setActive(true);
         userRepository.save(user);
     }
 

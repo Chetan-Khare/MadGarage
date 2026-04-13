@@ -29,6 +29,6 @@ public class Wishlist {
     private Product product;
 
     @CreationTimestamp
-    @Column(name = "added_at", updatable = false)
-    private LocalDateTime addedAt;
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 }

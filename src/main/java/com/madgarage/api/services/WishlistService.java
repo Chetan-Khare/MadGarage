@@ -77,7 +77,7 @@ public class WishlistService {
                 .imageUrl(p.getImageUrl())
                 .category(p.getCategory())
                 .condition(p.getCondition() != null ? p.getCondition().name() : "NEW")
-                .addedAt(wishlist.getAddedAt())
+                .addedAt(wishlist.getCreatedAt())
                 .build();
     }
 }

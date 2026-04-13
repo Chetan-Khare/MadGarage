@@ -3,6 +3,7 @@ package com.madgarage.api.services;
 import com.madgarage.api.dto.Base64ProductRequest;
 import com.madgarage.api.enums.FitmentCategory;
 import com.madgarage.api.enums.PartCondition;
+import com.madgarage.api.enums.Role;
 import com.madgarage.api.model.Product;
 import com.madgarage.api.model.ProductImage;
 import com.madgarage.api.model.User;
@@ -31,9 +32,7 @@ public class ProductCreationService {
 
     private final ProductRepository productRepository;
     private final VehicleRepository vehicleRepository;
-
-    private static final String UPLOAD_DIR_REL = "src/main/resources/static/uploads/";
-    private static final String GUIDES_DIR_REL = "src/main/resources/static/guides/";
+    private final FileStorageService fileStorageService;
 
     @Transactional
     public void addProduct(User seller,
@@ -51,13 +50,6 @@ public class ProductCreationService {
                            String fitmentCategory,
                            List<Long> vehicleIds) {
         try {
-            String projectRoot = System.getProperty("user.dir");
-            Path uploadPath = Paths.get(projectRoot, UPLOAD_DIR_REL).toAbsolutePath().normalize();
-            File uploadDirectory = uploadPath.toFile();
-            if (!uploadDirectory.exists()) {
-                uploadDirectory.mkdirs();
-            }
-
             List<ProductImage> productImages = new ArrayList<>();
             String primaryImageUrl = null;
 
@@ -69,11 +61,7 @@ public class ProductCreationService {
                     if (contentType == null || !contentType.startsWith("image/")) continue;
 
                     String ext = contentType.split("/")[1].replaceAll("[^a-zA-Z0-9]", "");
-                    String fileName = UUID.randomUUID() + "." + ext;
-                    Path filePath = uploadPath.resolve(fileName).normalize();
-                    
-                    Files.write(filePath, image.getBytes());
-                    String fileUrl = "/uploads/" + fileName;
+                    String fileUrl = fileStorageService.saveImage(image.getBytes(), ext);
 
                     if (primaryImageUrl == null) {
                         primaryImageUrl = fileUrl;
@@ -91,14 +79,9 @@ public class ProductCreationService {
 
             String guideUrl = null;
             if (guide != null && !guide.isEmpty()) {
-                Path guidesPath = Paths.get(projectRoot, GUIDES_DIR_REL).toAbsolutePath().normalize();
-                if (!guidesPath.toFile().exists()) guidesPath.toFile().mkdirs();
-
                 String guideExt = guide.getContentType() != null ? 
                         guide.getContentType().split("/")[1].replaceAll("[^a-zA-Z0-9]", "") : "pdf";
-                String guideName = UUID.randomUUID() + "." + guideExt;
-                Files.write(guidesPath.resolve(guideName), guide.getBytes());
-                guideUrl = "/guides/" + guideName;
+                guideUrl = fileStorageService.saveGuide(guide.getBytes(), guideExt);
             }
 
             List<Vehicle> compatibleVehicles = vehicleRepository.findAllById(vehicleIds != null ? vehicleIds : new ArrayList<>());
@@ -119,6 +102,7 @@ public class ProductCreationService {
                     .fittedVehicles(new HashSet<>(compatibleVehicles))
                     .images(productImages)
                     .seller(seller)
+                    .manualRatingOverride(false)
                     .build();
 
             for (ProductImage pi : productImages) {
@@ -137,10 +121,6 @@ public class ProductCreationService {
     @Transactional
     public void addProductBase64(User seller, Base64ProductRequest request) {
         try {
-            String projectRoot = System.getProperty("user.dir");
-            Path uploadPath = Paths.get(projectRoot, UPLOAD_DIR_REL).toAbsolutePath().normalize();
-            if (!uploadPath.toFile().exists()) uploadPath.toFile().mkdirs();
-
             List<ProductImage> productImages = new ArrayList<>();
             String primaryImageUrl = null;
 
@@ -151,11 +131,7 @@ public class ProductCreationService {
                     String base64Data = base64.contains(",") ? base64.split(",")[1] : base64;
                     byte[] bytes = java.util.Base64.getDecoder().decode(base64Data);
                     
-                    String fileName = UUID.randomUUID().toString() + ".jpg";
-                    Path filePath = uploadPath.resolve(fileName).normalize();
-                    
-                    Files.write(filePath, bytes);
-                    String fileUrl = "/uploads/" + fileName;
+                    String fileUrl = fileStorageService.saveImage(bytes, "jpg");
 
                     if (primaryImageUrl == null) primaryImageUrl = fileUrl;
                     productImages.add(ProductImage.builder().imageUrl(fileUrl).build());
@@ -168,14 +144,10 @@ public class ProductCreationService {
 
             String guideUrl = null;
             if (request.getBase64Guide() != null && !request.getBase64Guide().isEmpty()) {
-                Path guidesPath = Paths.get(projectRoot, GUIDES_DIR_REL).toAbsolutePath().normalize();
-                if (!guidesPath.toFile().exists()) guidesPath.toFile().mkdirs();
-
                 String base64Guard = request.getBase64Guide().contains(",") ? request.getBase64Guide().split(",")[1] : request.getBase64Guide();
                 byte[] guideBytes = java.util.Base64.getDecoder().decode(base64Guard);
-                String guideName = UUID.randomUUID() + "." + (request.getGuideExtension() != null ? request.getGuideExtension() : "pdf");
-                Files.write(guidesPath.resolve(guideName), guideBytes);
-                guideUrl = "/guides/" + guideName;
+                String guideExt = request.getGuideExtension() != null ? request.getGuideExtension() : "pdf";
+                guideUrl = fileStorageService.saveGuide(guideBytes, guideExt);
             }
 
             List<Vehicle> compatibleVehicles = vehicleRepository.findAllById(request.getVehicleIds() != null ? request.getVehicleIds() : new ArrayList<>());
@@ -196,6 +168,11 @@ public class ProductCreationService {
                     .fittedVehicles(new HashSet<>(compatibleVehicles))
                     .images(productImages)
                     .seller(seller)
+                    .manualRatingOverride(request.getIsManualRating() != null ? request.getIsManualRating() : false)
+                    .manualRating(request.getRating())
+                    .sellerResponse(request.getSellerResponse())
+                    .flagged(request.getFlagged() != null ? request.getFlagged() : false)
+                    .flagReason(request.getFlagReason())
                     .build();
 
             for (ProductImage pi : productImages) {
@@ -216,17 +193,15 @@ public class ProductCreationService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found."));
 
-        if (product.getSeller() == null || !product.getSeller().getId().equals(seller.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not allowed to edit this product.");
+        boolean isOwner = product.getSeller() != null && product.getSeller().getId().equals(seller.getId());
+        boolean isAdmin = seller.getRole() == Role.ROLE_ADMIN;
+
+        if (!isOwner && !isAdmin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Unauthorized: You are not allowed to edit this product.");
         }
 
         try {
-            String projectRoot = System.getProperty("user.dir");
-            Path uploadPath = Paths.get(projectRoot, UPLOAD_DIR_REL).toAbsolutePath().normalize();
-
             if (request.getBase64Images() != null && !request.getBase64Images().isEmpty()) {
-                if (!uploadPath.toFile().exists()) uploadPath.toFile().mkdirs();
-                
                 List<ProductImage> newImages = new ArrayList<>();
                 String primaryImageUrl = null;
 
@@ -236,11 +211,7 @@ public class ProductCreationService {
                     String base64Data = base64.contains(",") ? base64.split(",")[1] : base64;
                     byte[] bytes = java.util.Base64.getDecoder().decode(base64Data);
                     
-                    String fileName = UUID.randomUUID().toString() + ".jpg";
-                    Path filePath = uploadPath.resolve(fileName).normalize();
-                    
-                    Files.write(filePath, bytes);
-                    String fileUrl = "/uploads/" + fileName;
+                    String fileUrl = fileStorageService.saveImage(bytes, "jpg");
 
                     if (primaryImageUrl == null) primaryImageUrl = fileUrl;
                     newImages.add(ProductImage.builder().imageUrl(fileUrl).product(product).build());
@@ -254,19 +225,15 @@ public class ProductCreationService {
             }
 
             if (request.getBase64Guide() != null && !request.getBase64Guide().isEmpty()) {
-                Path guidesPath = Paths.get(projectRoot, GUIDES_DIR_REL).toAbsolutePath().normalize();
-                if (!guidesPath.toFile().exists()) guidesPath.toFile().mkdirs();
-
                 String base64Guard = request.getBase64Guide().contains(",") ? request.getBase64Guide().split(",")[1] : request.getBase64Guide();
                 byte[] guideBytes = java.util.Base64.getDecoder().decode(base64Guard);
-                String guideName = UUID.randomUUID() + "." + (request.getGuideExtension() != null ? request.getGuideExtension() : "pdf");
-                Files.write(guidesPath.resolve(guideName), guideBytes);
-                product.setInstallationGuideUrl("/guides/" + guideName);
+                String guideExt = request.getGuideExtension() != null ? request.getGuideExtension() : "pdf";
+                product.setInstallationGuideUrl(fileStorageService.saveGuide(guideBytes, guideExt));
             }
 
             List<Vehicle> compatibleVehicles = vehicleRepository.findAllById(request.getVehicleIds() != null ? request.getVehicleIds() : new ArrayList<>());
 
-            product.setSku(request.getSku());
+            if (request.getSku() != null) product.setSku(request.getSku());
             product.setBrand(request.getBrand());
             product.setPartName(request.getPartName());
             product.setCategory(request.getCategory());
@@ -282,6 +249,12 @@ public class ProductCreationService {
             }
             product.setStockQuantity(request.getStockQuantity());
             product.setFittedVehicles(new HashSet<>(compatibleVehicles));
+            
+            if (request.getIsManualRating() != null) product.setManualRatingOverride(request.getIsManualRating());
+            if (request.getRating() != null) product.setManualRating(request.getRating());
+            if (request.getSellerResponse() != null) product.setSellerResponse(request.getSellerResponse());
+            if (request.getFlagged() != null) product.setFlagged(request.getFlagged());
+            if (request.getFlagReason() != null) product.setFlagReason(request.getFlagReason());
 
             productRepository.save(product);
 
@@ -295,7 +268,11 @@ public class ProductCreationService {
     @Transactional
     public boolean deleteSellerProduct(User seller, Long productId) {
         return productRepository.findById(productId)
-                .filter(p -> p.getSeller() != null && p.getSeller().getId().equals(seller.getId()))
+                .filter(p -> {
+                    boolean isOwner = p.getSeller() != null && p.getSeller().getId().equals(seller.getId());
+                    boolean isAdmin = seller.getRole() == Role.ROLE_ADMIN;
+                    return isOwner || isAdmin;
+                })
                 .map(p -> {
                     productRepository.delete(p);
                     return true;
@@ -308,7 +285,10 @@ public class ProductCreationService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found."));
 
-        if (product.getSeller() == null || !product.getSeller().getId().equals(seller.getId())) {
+        boolean isOwner = product.getSeller() != null && product.getSeller().getId().equals(seller.getId());
+        boolean isAdmin = seller.getRole() == Role.ROLE_ADMIN;
+
+        if (!isOwner && !isAdmin) {
             return false;
         }
 

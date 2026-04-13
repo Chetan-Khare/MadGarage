@@ -8,7 +8,9 @@ import com.madgarage.api.services.InvoiceService;
 import com.madgarage.api.services.OrderService;
 import com.madgarage.api.services.UserService;
 import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,13 +42,14 @@ public class OrderController {
     }
 
     @GetMapping("/seller-orders")
+    @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')")
     public ResponseEntity<?> getSellerOrders(Principal principal) {
         User seller = userService.getCurrentUser(principal.getName());
         return ResponseEntity.ok(orderService.getSellerOrders(seller));
     }
 
     @PostMapping("/checkout")
-    public ResponseEntity<?> checkout(Principal principal, @RequestBody OrderRequest request) {
+    public ResponseEntity<?> checkout(Principal principal, @Valid @RequestBody OrderRequest request) {
         User customer = userService.getCurrentUser(principal.getName());
         OrderResponse response = orderService.placeOrder(customer, request);
         return ResponseEntity.ok(response);
@@ -65,23 +68,7 @@ public class OrderController {
                 order.getUser() != null ? order.getUser().getId() : "null",
                 customer.getId());
 
-        com.madgarage.api.model.User currentUser = userService.getCurrentUser(principal.getName());
-        boolean isAdmin = currentUser.getRole() == com.madgarage.api.enums.Role.ROLE_ADMIN;
-        boolean isSeller = currentUser.getRole() == com.madgarage.api.enums.Role.ROLE_SELLER;
-        boolean isOwner = order.getUser() != null && order.getUser().getId().equals(currentUser.getId());
-
-        // For sellers, check if they own any item in the order
-        boolean ownsAnyItem = false;
-        if (isSeller) {
-            ownsAnyItem = order.getItems().stream()
-                    .anyMatch(item -> item.getProduct() != null && 
-                                     item.getProduct().getSeller() != null && 
-                                     item.getProduct().getSeller().getId().equals(currentUser.getId()));
-        }
-
-        if (!isAdmin && !isOwner && !ownsAnyItem) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
+        assertOrderAccess(order, customer);
 
         byte[] pdf = invoiceService.generateInvoicePdf(order);
         HttpHeaders headers = new HttpHeaders();
@@ -99,25 +86,9 @@ public class OrderController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
 
-        com.madgarage.api.model.User currentUser = userService.getCurrentUser(principal.getName());
-        boolean isAdmin = currentUser.getRole() == com.madgarage.api.enums.Role.ROLE_ADMIN;
-        boolean isSeller = currentUser.getRole() == com.madgarage.api.enums.Role.ROLE_SELLER;
-        boolean isOwner = order.getUser() != null && order.getUser().getId().equals(currentUser.getId());
+        assertOrderAccess(order, customer);
 
-        // For sellers, check if they own any item in the order
-        boolean ownsAnyItem = false;
-        if (isSeller) {
-            ownsAnyItem = order.getItems().stream()
-                    .anyMatch(item -> item.getProduct() != null && 
-                                     item.getProduct().getSeller() != null && 
-                                     item.getProduct().getSeller().getId().equals(currentUser.getId()));
-        }
-
-        if (!isAdmin && !isOwner && !ownsAnyItem) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
-        OrderResponse response = orderService.mapToOrderResponse(order, currentUser);
+        OrderResponse response = orderService.mapToOrderResponse(order, customer);
         return ResponseEntity.ok(response);
     }
 
@@ -126,5 +97,35 @@ public class OrderController {
         User customer = userService.getCurrentUser(principal.getName());
         orderService.saveRating(orderId, request, customer);
         return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/{orderId:[0-9]+}/status")
+    @PreAuthorize("hasAnyRole('SELLER', 'ADMIN')")
+    public ResponseEntity<?> updateOrderStatus(Principal principal, @PathVariable Long orderId, @RequestParam String status) {
+        User requester = userService.getCurrentUser(principal.getName());
+        Order order = orderService.getOrderById(orderId);
+
+        if (order == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        assertOrderAccess(order, requester);
+
+        OrderResponse response = orderService.updateOrderStatus(orderId, status);
+        return ResponseEntity.ok(response);
+    }
+
+    private void assertOrderAccess(Order order, User currentUser) {
+        boolean isAdmin = currentUser.getRole() == com.madgarage.api.enums.Role.ROLE_ADMIN;
+        boolean isOwner = order.getUser() != null && order.getUser().getId().equals(currentUser.getId());
+        boolean isSeller = currentUser.getRole() == com.madgarage.api.enums.Role.ROLE_SELLER;
+        boolean ownsAnyItem = isSeller && order.getItems().stream()
+            .anyMatch(i -> i.getProduct() != null 
+                        && i.getProduct().getSeller() != null
+                        && i.getProduct().getSeller().getId().equals(currentUser.getId()));
+
+        if (!isAdmin && !isOwner && !ownsAnyItem) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied.");
+        }
     }
 }

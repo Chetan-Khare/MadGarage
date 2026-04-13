@@ -19,5 +19,9 @@ public class ProductRequest {
     private PartCondition condition;
     private String installationGuideUrl;
     private Long sellerId;
+    private boolean isManualRating;
+    private Double rating;
     private Boolean flagged;
+    private String flagReason;
+    private String sellerResponse;
 }

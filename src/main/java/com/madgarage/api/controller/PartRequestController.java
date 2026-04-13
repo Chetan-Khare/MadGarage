@@ -7,6 +7,7 @@ import com.madgarage.api.repository.PartRequestRepository;
 import com.madgarage.api.services.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.security.Principal;
 import java.util.List;
@@ -46,6 +47,7 @@ public class PartRequestController {
     }
     
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<PartRequest>> getMyRequests(Principal principal) {
         User currentUser = userService.getCurrentUser(principal.getName());
         List<PartRequest> myRequests = partRequestRepository.findByUserOrderByCreatedAtDesc(currentUser);

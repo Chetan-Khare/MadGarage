@@ -16,4 +16,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // Admin Dashboard Counters
     long countByRole(Role role);
+    long countByIsActiveTrue();
+    long countByRoleAndIsActiveTrue(Role role);
 }

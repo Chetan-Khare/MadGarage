@@ -27,4 +27,6 @@ public class ProductResponse {
     private boolean flagged;
     private String flagReason;
     private String sellerResponse;
+    private boolean isManualRating;
+    private Double rating;
 }

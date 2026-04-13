@@ -6,6 +6,7 @@ import com.madgarage.api.services.UserService;
 import com.madgarage.api.services.WishlistService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.security.Principal;
 import java.util.List;
@@ -17,6 +18,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/wishlist")
+@PreAuthorize("hasRole('CUSTOMER') or hasRole('ADMIN') or hasRole('GARAGE')")
 public class WishlistController {
 
     private final WishlistService wishlistService;
