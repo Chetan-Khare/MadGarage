@@ -154,32 +154,39 @@ public class AuthService {
      */
     public AuthResponse login(LoginRequest request) {
         String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
-        log.debug("Login attempt for: [{}]", email);
+        log.info("[Auth] Login attempt initiated for canonicalized email: [{}]", email);
         
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(email, request.getPassword())
             );
         } catch (AuthenticationException e) {
-            log.debug("Authentication failed for: [{}] | Reason: {}", email, e.getMessage());
-            // Check if user even exists in DB
-            boolean exists = userRepository.findByEmail(email).isPresent();
-            log.debug("Does user exist in DB? {}", exists);
+            log.warn("[Auth] AuthenticationManager rejected credentials for [{}]. Reason: {}", email, e.getMessage());
+            
+            // Check if user exists and manually verify password for definitive diagnostic
+            userRepository.findByEmail(email).ifPresentOrElse(
+                u -> {
+                    boolean matches = passwordEncoder.matches(request.getPassword(), u.getPassword());
+                    log.info("[Auth] Diagnostic: User [{}] EXISTS. Manual password match check: {}", email, matches);
+                },
+                () -> log.info("[Auth] Diagnostic: User [{}] DOES NOT EXIST in database.", email)
+            );
+            
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password.");
         }
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> {
-                    log.error("CRITICAL: User authenticated but not found in DB: [{}]", email);
+                    log.error("[Auth] CRITICAL: Authentication SUCCEEDED but record for [{}] disappeared from DB midway!", email);
                     return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password.");
                 });
 
         if (!user.isActive()) {
-            log.warn("Login attempt for deactivated user: [{}]", email);
+            log.warn("[Auth] Login BLOCKED for deactivated account: [{}]", email);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This account has been deactivated. Access denied.");
         }
 
-        log.debug("Login successful for: [{}] | Role: {}", email, user.getRole());
+        log.info("[Auth] Login SUCCESSFUL for userId: {} [{}]", user.getId(), email);
         String token = jwtService.generateToken(user);
         return AuthResponse.builder()
                 .token(token)

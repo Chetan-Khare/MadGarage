@@ -14,4 +14,5 @@ public class UserProfileResponse {
     private String role;
     private String profileImageUrl;
     private boolean active;
+    private String token; // Refreshed session token for email updates
 }

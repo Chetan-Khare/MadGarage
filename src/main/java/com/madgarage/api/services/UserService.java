@@ -11,6 +11,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -27,6 +30,7 @@ import java.nio.file.Paths;
 @Service
 @RequiredArgsConstructor
 public class UserService {
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -34,6 +38,7 @@ public class UserService {
     private final ProductRepository productRepository;
     private final VehicleRepository vehicleRepository;
     private final FileStorageService fileStorageService;
+    private final JwtService jwtService;
 
     /**
      * Resolves the currently authenticated user by email.
@@ -73,8 +78,10 @@ public class UserService {
     /**
      * Applies non-null field updates to the user's profile and persists the change.
      */
+    @Transactional
     public UserProfileResponse updateProfile(String email, UserProfileUpdateRequest request) {
         User user = getCurrentUser(email);
+        boolean emailChanged = false;
 
         if (request.getFirstName() != null && !request.getFirstName().isBlank()) {
             user.setFirstName(request.getFirstName());
@@ -89,15 +96,24 @@ public class UserService {
                 if (userRepository.findByEmail(newEmail).isPresent()) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is already taken by another account.");
                 }
+                emailChanged = true;
             }
             user.setEmail(newEmail);
         }
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            log.info("[Identity] Updating password for user: {}", user.getEmail());
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
 
+        log.info("[Identity] Persisting profile changes for userId: {} | New Email: {}", user.getId(), user.getEmail());
         user = userRepository.save(user);
-        return toProfileResponse(user);
+        
+        UserProfileResponse response = toProfileResponse(user);
+        if (emailChanged) {
+            log.info("[Identity] Email changed, generating a refreshed session token for user: {}", user.getEmail());
+            response.setToken(jwtService.generateToken(user));
+        }
+        return response;
     }
 
     /**
@@ -206,6 +222,7 @@ public class UserService {
     /**
      * Updates an existing user's record from the Administrative control panel.
      */
+    @Transactional
     public void updateUserByAdmin(Long id, B2BUserRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
@@ -229,6 +246,7 @@ public class UserService {
             user.setPhone(request.getPhone());
         }
 
+        log.info("[Admin] Persisting identity revision for userId: {} by administrative action. New Email: {}", id, user.getEmail());
         userRepository.save(user);
     }
 
