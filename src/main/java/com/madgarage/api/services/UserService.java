@@ -83,7 +83,14 @@ public class UserService {
             user.setLastName(request.getLastName());
         }
         if (request.getEmail() != null && !request.getEmail().isBlank()) {
-            user.setEmail(request.getEmail());
+            String newEmail = request.getEmail().trim().toLowerCase();
+            // P1 FIX: Check for email conflicts before save to avoid DB-level DataIntegrityViolation
+            if (!newEmail.equalsIgnoreCase(user.getEmail())) {
+                if (userRepository.findByEmail(newEmail).isPresent()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is already taken by another account.");
+                }
+            }
+            user.setEmail(newEmail);
         }
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -152,7 +159,11 @@ public class UserService {
      * Creates a new B2B user (SELLER or GARAGE role) for the admin dashboard.
      */
     public void createB2BUser(B2BUserRequest request) {
-        if (request.getEmail() != null && userRepository.findByEmail(request.getEmail()).isPresent()) {
+        if (request.getEmail() == null || request.getEmail().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is required for new accounts.");
+        }
+
+        if (userRepository.findByEmail(request.getEmail().toLowerCase()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is already registered!");
         }
 
@@ -174,11 +185,16 @@ public class UserService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid Role. Authorized roles are SELLER, GARAGE, or ADMIN.");
         }
 
+        // P1 FIX: Default password to password123 if not provided by admin
+        String rawPassword = (request.getPassword() != null && !request.getPassword().isBlank()) 
+                ? request.getPassword() 
+                : "password123";
+
         User newUser = User.builder()
-                .firstName(request.getFirstName())
-                .lastName(request.getLastName())
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
+                .firstName(request.getFirstName() != null ? request.getFirstName() : "Operator")
+                .lastName(request.getLastName() != null ? request.getLastName() : "User")
+                .email(request.getEmail().trim().toLowerCase())
+                .password(passwordEncoder.encode(rawPassword))
                 .role(newRole)
                 .phone(request.getPhone())
                 .isActive(true)
@@ -194,19 +210,15 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
 
-        if (request.getFirstName() != null && !request.getFirstName().isBlank()) {
-            user.setFirstName(request.getFirstName());
-        }
-        if (request.getLastName() != null && !request.getLastName().isBlank()) {
-            user.setLastName(request.getLastName());
-        }
+        // P1 REQ: Names and Password are now STATIC for Admins. Only Email and Phone can be edited.
         
         // Handle Email unique constraint
         if (request.getEmail() != null && !request.getEmail().equalsIgnoreCase(user.getEmail())) {
-            if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+            String newEmail = request.getEmail().trim().toLowerCase();
+            if (userRepository.findByEmail(newEmail).isPresent()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New email is already taken.");
             }
-            user.setEmail(request.getEmail());
+            user.setEmail(newEmail);
         }
 
         // Handle Phone unique constraint
@@ -215,19 +227,6 @@ public class UserService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New phone number is already taken.");
             }
             user.setPhone(request.getPhone());
-        }
-
-        if (request.getPassword() != null && !request.getPassword().isBlank()) {
-            user.setPassword(passwordEncoder.encode(request.getPassword()));
-        }
-
-        if (request.getRole() != null) {
-            try {
-                String roleStr = request.getRole().toUpperCase();
-                if (!roleStr.startsWith("ROLE_")) roleStr = "ROLE_" + roleStr;
-                Role newRole = Role.valueOf(roleStr);
-                user.setRole(newRole);
-            } catch (Exception ignored) {}
         }
 
         userRepository.save(user);

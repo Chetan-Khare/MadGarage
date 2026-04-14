@@ -44,8 +44,8 @@ public class AuthService {
     }
 
     /**
-     * Verifies OTP, then finds or auto-creates a CUSTOMER account.
-     * Returns an AuthResponse containing the JWT token and user metadata.
+     * Verifies OTP, then finds existing user or returns a registration requirement.
+     * Returns an AuthResponse containing either a login JWT or a registrationToken.
      */
     public AuthResponse verifyOtp(OtpVerificationRequest request) {
         if (!otpService.verifyOtp(request.getPhone(), request.getOtp())) {
@@ -53,29 +53,70 @@ public class AuthService {
         }
 
         Optional<User> userOptional = userRepository.findByPhone(request.getPhone());
-        User user;
         if (userOptional.isPresent()) {
-            user = userOptional.get();
+            User user = userOptional.get();
             if (!user.isActive()) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This account has been deactivated. Access denied.");
             }
-        } else {
-            // Auto-create new Customer account for unrecognised phone numbers
-            String randomPassword = java.util.UUID.randomUUID().toString();
-            user = User.builder()
-                    .firstName("Customer")
-                    .lastName(request.getPhone())
-                    .email(request.getPhone() + "@madgarage.com") // Placeholder
-                    .password(passwordEncoder.encode(randomPassword))
-                    .phone(request.getPhone())
-                    .role(Role.ROLE_CUSTOMER)
-                    .isActive(true)
+            String token = jwtService.generateToken(user);
+            log.info("[Auth] Existing user found. Returning token for userId: {}", user.getId());
+            return AuthResponse.builder()
+                    .token(token)
+                    .message("OTP Login Successful!")
+                    .userId(user.getId())
+                    .role(user.getRole().name())
                     .build();
-            userRepository.save(user);
+        } else {
+            // First time login: require registration details (email/password)
+            String regToken = jwtService.generateRegistrationToken(request.getPhone());
+            log.info("[Auth] New user detected. Returning registrationToken.");
+            return AuthResponse.builder()
+                    .message("Verification successful! Please complete your profile.")
+                    .requiresRegistration(true)
+                    .registrationToken(regToken)
+                    .build();
+        }
+    }
+
+    /**
+     * Completes registration for a verified phone number.
+     * Validates account details and creates the final user record.
+     */
+    public AuthResponse completeRegistration(CompleteRegistrationRequest request) {
+        String phone;
+        try {
+            phone = jwtService.extractPhoneFromRegistrationToken(request.getRegistrationToken());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired registration session.");
         }
 
-        String token = jwtService.generateToken(user);
-        return new AuthResponse(token, "OTP Login Successful!", user.getId(), user.getRole().name());
+        if (userRepository.findByEmail(request.getEmail().toLowerCase()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is already taken.");
+        }
+
+        if (userRepository.findByPhone(phone).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Account already exists for this phone number.");
+        }
+
+        User newUser = User.builder()
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .email(request.getEmail().trim().toLowerCase())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .phone(phone)
+                .role(Role.ROLE_CUSTOMER)
+                .isActive(true)
+                .build();
+
+        newUser = userRepository.save(newUser);
+        String token = jwtService.generateToken(newUser);
+        
+        return AuthResponse.builder()
+                .token(token)
+                .message("Account created successfully!")
+                .userId(newUser.getId())
+                .role(newUser.getRole().name())
+                .build();
     }
 
     /**
@@ -99,7 +140,12 @@ public class AuthService {
 
         userRepository.save(newUser);
         String token = jwtService.generateToken(newUser);
-        return new AuthResponse(token, "Registration successful!", newUser.getId(), newUser.getRole().name());
+        return AuthResponse.builder()
+                .token(token)
+                .message("Registration successful!")
+                .userId(newUser.getId())
+                .role(newUser.getRole().name())
+                .build();
     }
 
     /**
@@ -135,6 +181,11 @@ public class AuthService {
 
         log.debug("Login successful for: [{}] | Role: {}", email, user.getRole());
         String token = jwtService.generateToken(user);
-        return new AuthResponse(token, "Login successful!", user.getId(), user.getRole().name());
+        return AuthResponse.builder()
+                .token(token)
+                .message("Login successful!")
+                .userId(user.getId())
+                .role(user.getRole().name())
+                .build();
     }
 }

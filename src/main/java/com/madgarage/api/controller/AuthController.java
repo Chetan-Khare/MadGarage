@@ -43,4 +43,10 @@ public class AuthController {
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/complete-registration")
+    public ResponseEntity<?> completeRegistration(@Valid @RequestBody CompleteRegistrationRequest request) {
+        AuthResponse response = authService.completeRegistration(request);
+        return ResponseEntity.ok(response);
+    }
 }

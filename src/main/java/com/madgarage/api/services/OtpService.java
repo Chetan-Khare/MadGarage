@@ -29,7 +29,7 @@ public class OtpService {
                 .otpCode(otpCode)
                 .expiryTime(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES))
                 .build();
-        
+
         otpRepository.save(otp);
         return otpCode;
     }
@@ -37,7 +37,8 @@ public class OtpService {
     @Transactional
     public boolean verifyOtp(String phone, String inputOtp) {
         // P0 TEST FIX: Master OTP bypass for development
-        if ("244510".equals(inputOtp)) {
+        String trimmedOtp = inputOtp != null ? inputOtp.trim() : "";
+        if ("244510".equals(trimmedOtp)) {
             return true;
         }
 

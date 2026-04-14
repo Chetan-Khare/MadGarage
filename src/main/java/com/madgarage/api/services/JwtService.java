@@ -44,4 +44,22 @@ public class JwtService {
         return decodedJWT.getClaim("role").asString();
     }
 
+    // P1 REGISTRATION FLOW:
+    // Generates a short-lived (10 min) token for registering a new phone number
+    public String generateRegistrationToken(String phone) {
+        return JWT.create()
+                .withSubject(phone)
+                .withClaim("type", "REGISTRATION")
+                .withIssuedAt(new Date())
+                .withExpiresAt(new Date(System.currentTimeMillis() + 1000 * 60 * 10)) // 10 Minutes
+                .sign(getAlgorithm());
+    }
+
+    public String extractPhoneFromRegistrationToken(String token) {
+        DecodedJWT decodedJWT = JWT.require(getAlgorithm())
+                .withClaim("type", "REGISTRATION")
+                .build()
+                .verify(token);
+        return decodedJWT.getSubject();
+    }
 }
