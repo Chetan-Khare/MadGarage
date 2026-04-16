@@ -135,7 +135,8 @@ public class UserService {
             userRepository.save(user);
             return fileUrl;
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to upload image: " + e.getMessage());
+            log.error("Failed to upload image for user {}: ", email, e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to upload image. Please try again later.");
         }
     }
 
@@ -262,14 +263,15 @@ public class UserService {
         Double revenueObj = orderRepository.calculateTotalRevenue();
         double totalRevenue = (revenueObj != null) ? revenueObj : 0.0;
 
-        java.util.List<Double> sixMonthRevenue = java.util.Arrays.asList(
-                totalRevenue * 0.1,
-                totalRevenue * 0.15,
-                totalRevenue * 0.2,
-                totalRevenue * 0.35,
-                totalRevenue * 0.6,
-                totalRevenue
-        );
+        java.util.List<Object[]> monthlyData = orderRepository.getMonthlyRevenueForLastSixMonths();
+        java.util.List<Double> sixMonthRevenue = monthlyData.stream()
+                .map(row -> row[0] != null ? ((Number) row[0]).doubleValue() : 0.0)
+                .collect(java.util.stream.Collectors.toList());
+
+        // Pad with zeros if less than 6 months of data
+        while (sixMonthRevenue.size() < 6) {
+            sixMonthRevenue.add(0, 0.0);
+        }
 
         return new AdminAnalyticsResponse(totalUsers, totalSellers, totalProducts, totalVehicles, totalRevenue, sixMonthRevenue);
     }

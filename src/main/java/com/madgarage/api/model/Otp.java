@@ -32,4 +32,8 @@ public class Otp {
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private int attempts = 0;
 }

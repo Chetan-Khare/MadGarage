@@ -52,8 +52,16 @@ public class OtpService {
                     if (data.getOtpCode().equals(inputOtp)) {
                         otpRepository.deleteByPhone(phone); // Burn after use
                         return true;
+                    } else {
+                        // Increment attempts on mismatch
+                        data.setAttempts(data.getAttempts() + 1);
+                        if (data.getAttempts() >= 5) {
+                            otpRepository.delete(data); // Lock out after 5 failures
+                        } else {
+                            otpRepository.save(data);
+                        }
+                        return false;
                     }
-                    return false;
                 }).orElse(false);
     }
 }

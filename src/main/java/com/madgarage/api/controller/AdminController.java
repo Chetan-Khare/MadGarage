@@ -80,6 +80,9 @@ public class AdminController {
         if (newStatus == null || newStatus.trim().isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
+        
+        // Validation check is now handled centrally in the OrderService implementation
+        // but we ensure clean input here as well if necessary.
         return ResponseEntity.ok(orderService.updateOrderStatus(id, newStatus));
     }
 

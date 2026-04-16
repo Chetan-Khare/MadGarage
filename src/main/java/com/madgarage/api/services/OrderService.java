@@ -134,7 +134,7 @@ public class OrderService {
             }
 
             Product product = productRepository.findById(itemDto.getProductId())
-                    .orElseThrow(() -> new RuntimeException("Product not found: " + itemDto.getProductId()));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found: " + itemDto.getProductId()));
 
             if (product.getStockQuantity() < itemDto.getQuantity()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Not enough stock for: " + product.getPartName());
@@ -186,10 +186,18 @@ public class OrderService {
         return orderRepository.findByIdWithUser(id).orElse(null);
     }
 
+    private static final java.util.List<String> ALLOWED_STATUSES = java.util.Arrays.asList("PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELLED");
+
     public OrderResponse updateOrderStatus(Long orderId, String newStatus) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found."));
-        order.setStatus(newStatus.toUpperCase());
+        
+        String canonicalStatus = newStatus.toUpperCase().trim();
+        if (!ALLOWED_STATUSES.contains(canonicalStatus)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid status value: " + newStatus);
+        }
+
+        order.setStatus(canonicalStatus);
         orderRepository.save(order);
         return mapToOrderResponse(order, order.getUser());
     }

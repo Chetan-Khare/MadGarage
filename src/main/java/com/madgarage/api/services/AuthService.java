@@ -36,11 +36,9 @@ public class AuthService {
 
     /**
      * Generates and logs an OTP for the given phone number.
-     * Returns the OTP string so the controller can decide how to surface it
-     * (currently echoed in response for test purposes).
      */
-    public String sendOtp(OtpRequest request) {
-        return otpService.generateOtp(request.getPhone());
+    public void sendOtp(OtpRequest request) {
+        otpService.generateOtp(request.getPhone());
     }
 
     /**
@@ -161,16 +159,7 @@ public class AuthService {
                     new UsernamePasswordAuthenticationToken(email, request.getPassword())
             );
         } catch (AuthenticationException e) {
-            log.warn("[Auth] AuthenticationManager rejected credentials for [{}]. Reason: {}", email, e.getMessage());
-            
-            // Check if user exists and manually verify password for definitive diagnostic
-            userRepository.findByEmail(email).ifPresentOrElse(
-                u -> {
-                    boolean matches = passwordEncoder.matches(request.getPassword(), u.getPassword());
-                    log.info("[Auth] Diagnostic: User [{}] EXISTS. Manual password match check: {}", email, matches);
-                },
-                () -> log.info("[Auth] Diagnostic: User [{}] DOES NOT EXIST in database.", email)
-            );
+
             
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password.");
         }

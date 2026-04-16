@@ -4,6 +4,7 @@ import com.madgarage.api.dto.UserProfileResponse;
 import com.madgarage.api.dto.UserProfileUpdateRequest;
 import com.madgarage.api.model.User;
 import com.madgarage.api.services.UserService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,7 +34,7 @@ public class UserController {
     @PutMapping("/profile")
     public ResponseEntity<?> updateProfile(
             Principal principal,
-            @RequestBody UserProfileUpdateRequest request) {
+            @Valid @RequestBody UserProfileUpdateRequest request) {
         UserProfileResponse response = userService.updateProfile(principal.getName(), request);
         return ResponseEntity.ok(response);
     }

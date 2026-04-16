@@ -31,9 +31,18 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            "ORDER BY o.id DESC")
     List<Order> findByUserWithItems(@Param("user") User user);
 
-    @Query("SELECT SUM(oi.priceAtPurchase * oi.quantity) FROM OrderItem oi " +
-           "WHERE oi.product.seller = :seller")
+    @Query("SELECT p.seller.id, SUM(oi.priceAtPurchase * oi.quantity) FROM OrderItem oi " +
+           "WHERE oi.product.seller = :seller " +
+           "GROUP BY p.seller.id") // Added missing group by or similar if needed
     Double calculateRevenueBySeller(@Param("seller") User seller);
+
+    @Query(value = "SELECT SUM(grand_total) as total, " +
+           "STRFTIME('%Y-%m', order_date) as month " +
+           "FROM orders " +
+           "WHERE order_date >= DATE('now', '-6 months') " +
+           "GROUP BY month " +
+           "ORDER BY month ASC", nativeQuery = true)
+    List<Object[]> getMonthlyRevenueForLastSixMonths();
 
     @Query("SELECT DISTINCT o FROM Order o " +
            "JOIN FETCH o.items i " +

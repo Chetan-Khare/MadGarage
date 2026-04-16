@@ -46,6 +46,10 @@ public class SecurityConfig {
             public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
                 com.madgarage.api.model.User user = userRepository.findByEmail(username)
                         .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+                
+                if (!user.isActive()) {
+                    throw new UsernameNotFoundException("This account has been deactivated: " + username);
+                }
                         
                 return new org.springframework.security.core.userdetails.User(
                         user.getEmail(),
@@ -106,7 +110,7 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOriginPatterns(List.of(
                 "http://localhost:8081",
-                "http://192.168.*.*:8081",
+                "http://192.168.[0-9]{1,3}.[0-9]{1,3}:8081",
                 "http://localhost:3000",
                 "http://localhost:8080"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));

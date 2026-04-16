@@ -7,14 +7,20 @@ import lombok.Data;
 
 @Data
 public class B2BUserRequest {
+    @NotBlank(message = "First name is required")
+    @Size(max = 50, message = "First name too long")
     private String firstName;
+
+    @NotBlank(message = "Last name is required")
+    @Size(max = 50, message = "Last name too long")
     private String lastName;
 
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
     private String email;
 
-    @Size(min = 6, message = "Password must be at least 6 characters")
+    @NotBlank(message = "Password is required for new B2B accounts")
+    @Size(min = 6, max = 100, message = "Password must be between 6 and 100 characters")
     private String password;
 
     @NotBlank(message = "Role is required")

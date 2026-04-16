@@ -22,7 +22,7 @@ public class AuthController {
 
     @PostMapping("/send-otp")
     public ResponseEntity<?> sendOtp(@Valid @RequestBody OtpRequest request) {
-        String otp = authService.sendOtp(request);
+        authService.sendOtp(request);
         return ResponseEntity.ok("OTP sent successfully to " + request.getPhone());
     }
 
