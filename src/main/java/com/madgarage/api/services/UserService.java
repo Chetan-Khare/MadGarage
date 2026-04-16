@@ -202,10 +202,11 @@ public class UserService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid Role. Authorized roles are SELLER, GARAGE, or ADMIN.");
         }
 
-        // P1 FIX: Default password to password123 if not provided by admin
-        String rawPassword = (request.getPassword() != null && !request.getPassword().isBlank()) 
-                ? request.getPassword() 
-                : "password123";
+        // P2 FIX: Removed 'password123' security fallback. Admins must explicitly provide credentials for new accounts.
+        if (request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A temporary password is required for new accounts.");
+        }
+        String rawPassword = request.getPassword();
 
         User newUser = User.builder()
                 .firstName(request.getFirstName() != null ? request.getFirstName() : "Operator")
