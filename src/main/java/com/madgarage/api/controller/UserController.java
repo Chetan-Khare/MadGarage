@@ -66,4 +66,9 @@ public class UserController {
         userService.savePushToken(principal.getName(), token);
         return ResponseEntity.ok().build();
     }
+
+    @GetMapping("/garages")
+    public ResponseEntity<java.util.List<UserProfileResponse>> getGaragesByCity(@RequestParam String city) {
+        return ResponseEntity.ok(userService.getTieUpGaragesByCity(city));
+    }
 }

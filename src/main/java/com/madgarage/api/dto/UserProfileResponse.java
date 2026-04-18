@@ -15,4 +15,10 @@ public class UserProfileResponse {
     private String profileImageUrl;
     private boolean active;
     private String token; // Refreshed session token for email updates
+
+    private String city;
+    private String address;
+    private Double latitude;
+    private Double longitude;
+    private boolean tieUp;
 }

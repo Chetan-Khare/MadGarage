@@ -37,6 +37,11 @@ public class Order {
     private String state;
     private String pincode;
 
+    // Fitting Details
+    private String deliveryType; // HOME_DELIVERY or GARAGE_FITTING
+    private Long fittingGarageId;
+    private String fittingStatus; // NONE, PENDING_INSPECTION, INSPECTED, FITTED
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     @ToString.Exclude

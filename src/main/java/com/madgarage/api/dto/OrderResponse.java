@@ -28,6 +28,12 @@ public class OrderResponse {
     private String state;
     private String pincode;
 
+    private String deliveryType;
+    private Long fittingGarageId;
+    private String fittingStatus;
+    private String fittingGarageName;
+    private String fittingGarageAddress;
+
     // Rating Details (Optional)
     private Integer partRating;
     private Integer deliveryRating;

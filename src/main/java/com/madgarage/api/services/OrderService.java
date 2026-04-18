@@ -20,6 +20,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final OrderRatingRepository orderRatingRepository;
+    private final UserRepository userRepository;
 
     // SCALE-03 FIX: Shipping fee from config, not hardcoded
     @Value("${app.pricing.shipping-fee:250.0}")
@@ -42,6 +43,12 @@ public class OrderService {
     public List<OrderResponse> getAllOrdersAsDto() {
         return orderRepository.findAll().stream()
                 .map(order -> mapToOrderResponse(order, null))
+                .collect(Collectors.toList());
+    }
+
+    public List<OrderResponse> getGarageFittings(User garage) {
+        return orderRepository.findByFittingGarageIdWithItems(garage.getId()).stream()
+                .map(order -> mapToOrderResponse(order, garage))
                 .collect(Collectors.toList());
     }
 
@@ -104,8 +111,19 @@ public class OrderService {
                 .city(order.getCity())
                 .state(order.getState())
                 .pincode(order.getPincode())
+                .deliveryType(order.getDeliveryType())
+                .fittingGarageId(order.getFittingGarageId())
+                .fittingStatus(order.getFittingStatus())
                 .isOwner(requester != null && order.getUser() != null && order.getUser().getId().equals(requester.getId()))
                 .items(itemResponses);
+
+        // Fetch garage details if it's a fitting order
+        if (order.getFittingGarageId() != null) {
+            userRepository.findById(order.getFittingGarageId()).ifPresent(garage -> {
+                builder.fittingGarageName(garage.getFirstName() + " " + garage.getLastName());
+                builder.fittingGarageAddress((garage.getAddress() != null ? garage.getAddress() + ", " : "") + garage.getCity());
+            });
+        }
 
         // Fetch rating if exists
         orderRatingRepository.findByOrderId(order.getId()).ifPresent(rating -> {
@@ -117,10 +135,11 @@ public class OrderService {
         return builder.build();
     }
 
-    public OrderService(OrderRepository orderRepository, ProductRepository productRepository, OrderRatingRepository orderRatingRepository) {
+    public OrderService(OrderRepository orderRepository, ProductRepository productRepository, OrderRatingRepository orderRatingRepository, UserRepository userRepository) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.orderRatingRepository = orderRatingRepository;
+        this.userRepository = userRepository;
     }
 
     @Transactional // If anything fails, it rolls back the whole database transaction
@@ -170,6 +189,9 @@ public class OrderService {
                 .city(request.getCity())
                 .state(request.getState())
                 .pincode(request.getPincode())
+                .deliveryType(request.getDeliveryType() != null ? request.getDeliveryType() : "HOME_DELIVERY")
+                .fittingGarageId(request.getFittingGarageId())
+                .fittingStatus("GARAGE_FITTING".equals(request.getDeliveryType()) ? "PENDING_INSPECTION" : "NONE")
                 .build();
 
         for (OrderItem oi : orderItems) {

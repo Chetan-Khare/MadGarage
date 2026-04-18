@@ -50,6 +50,14 @@ public class User {
     @Column(name = "expo_push_token")
     private String expoPushToken;
 
+    private String city;
+    private String address;
+    private Double latitude;
+    private Double longitude;
+
+    @Builder.Default
+    private Boolean isTieUp = false;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;

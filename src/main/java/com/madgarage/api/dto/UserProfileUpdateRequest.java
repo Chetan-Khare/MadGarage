@@ -17,4 +17,9 @@ public class UserProfileUpdateRequest {
 
     @Size(min = 6, max = 12, message = "Password must be between 6 and 12 characters")
     private String password;
+
+    private String address;
+    private String city;
+    private Double latitude;
+    private Double longitude;
 }

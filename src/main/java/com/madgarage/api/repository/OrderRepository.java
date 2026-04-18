@@ -31,6 +31,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            "ORDER BY o.id DESC")
     List<Order> findByUserWithItems(@Param("user") User user);
 
+    @Query("SELECT o FROM Order o JOIN FETCH o.user LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product p WHERE o.fittingGarageId = :garageId ORDER BY o.orderDate DESC")
+    List<Order> findByFittingGarageIdWithItems(@Param("garageId") Long garageId);
+
     @Query("SELECT SUM(oi.priceAtPurchase * oi.quantity) FROM OrderItem oi " +
            "WHERE oi.product.seller = :seller")
     Double calculateRevenueBySeller(@Param("seller") User seller);
@@ -44,6 +47,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Object[]> getMonthlyRevenueForLastSixMonths();
 
     @Query("SELECT DISTINCT o FROM Order o " +
+           "JOIN FETCH o.user " +
            "JOIN FETCH o.items i " +
            "JOIN FETCH i.product p " +
            "WHERE p.seller = :seller " +

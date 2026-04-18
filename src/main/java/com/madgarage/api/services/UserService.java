@@ -72,6 +72,11 @@ public class UserService {
                 .role(user.getRole().name())
                 .profileImageUrl(user.getProfileImageUrl())
                 .active(user.isActive())
+                .city(user.getCity())
+                .address(user.getAddress())
+                .latitude(user.getLatitude())
+                .longitude(user.getLongitude())
+                .tieUp(user.getIsTieUp() != null ? user.getIsTieUp() : false)
                 .build();
     }
 
@@ -103,6 +108,18 @@ public class UserService {
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             log.info("[Identity] Updating password for user: {}", user.getEmail());
             user.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
+        if (request.getAddress() != null) {
+            user.setAddress(request.getAddress());
+        }
+        if (request.getCity() != null) {
+            user.setCity(request.getCity());
+        }
+        if (request.getLatitude() != null) {
+            user.setLatitude(request.getLatitude());
+        }
+        if (request.getLongitude() != null) {
+            user.setLongitude(request.getLongitude());
         }
 
         log.info("[Identity] Persisting profile changes for userId: {} | New Email: {}", user.getId(), user.getEmail());
@@ -215,6 +232,11 @@ public class UserService {
                 .password(passwordEncoder.encode(rawPassword))
                 .role(newRole)
                 .phone(request.getPhone())
+                .city(request.getCity())
+                .address(request.getAddress())
+                .latitude(request.getLatitude())
+                .longitude(request.getLongitude())
+                .isTieUp(request.getIsTieUp() != null ? request.getIsTieUp() : false)
                 .isActive(true)
                 .build();
 
@@ -247,6 +269,12 @@ public class UserService {
             }
             user.setPhone(request.getPhone());
         }
+
+        if (request.getCity() != null) user.setCity(request.getCity());
+        if (request.getAddress() != null) user.setAddress(request.getAddress());
+        if (request.getLatitude() != null) user.setLatitude(request.getLatitude());
+        if (request.getLongitude() != null) user.setLongitude(request.getLongitude());
+        if (request.getIsTieUp() != null) user.setIsTieUp(request.getIsTieUp());
 
         log.info("[Admin] Persisting identity revision for userId: {} by administrative action. New Email: {}", id, user.getEmail());
         userRepository.save(user);
@@ -343,5 +371,16 @@ public class UserService {
         User user = getCurrentUser(email);
         user.setExpoPushToken(expoPushToken);
         userRepository.save(user);
+    }
+
+    /**
+     * Fetches all tie-up garages for a specific city.
+     * Core logic for the city-based visibility feature.
+     */
+    public java.util.List<UserProfileResponse> getTieUpGaragesByCity(String city) {
+        if (city == null || city.isBlank()) return new java.util.ArrayList<>();
+        return userRepository.findByRoleAndCityIgnoreCaseAndIsTieUpTrueAndIsActiveTrue(Role.ROLE_GARAGE, city.trim()).stream()
+                .map(this::toProfileResponse)
+                .collect(java.util.stream.Collectors.toList());
     }
 }

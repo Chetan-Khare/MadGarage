@@ -44,7 +44,7 @@ spring:
         api-key: ${GEMINI_API_KEY:DISABLED} # FALLBACK IF NO KEY IS PROVIDED
         chat:
           options:
-            model: gemma-4-26b
+            model: ${SPRING_AI_MODEL:gemma-4-26b}
 
 # Tomcat connector config — remove default file-part count limit for multi-image uploads
 server:

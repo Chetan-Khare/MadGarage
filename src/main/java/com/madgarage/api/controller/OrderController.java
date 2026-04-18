@@ -48,6 +48,13 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getSellerOrders(seller));
     }
 
+    @GetMapping("/garage-fittings")
+    @PreAuthorize("hasRole('GARAGE') or hasRole('ADMIN')")
+    public ResponseEntity<?> getGarageFittings(Principal principal) {
+        User garage = userService.getCurrentUser(principal.getName());
+        return ResponseEntity.ok(orderService.getGarageFittings(garage));
+    }
+
     @PostMapping("/checkout")
     public ResponseEntity<?> checkout(Principal principal, @Valid @RequestBody OrderRequest request) {
         User customer = userService.getCurrentUser(principal.getName());
@@ -124,7 +131,11 @@ public class OrderController {
                         && i.getProduct().getSeller() != null
                         && i.getProduct().getSeller().getId().equals(currentUser.getId()));
 
-        if (!isAdmin && !isOwner && !ownsAnyItem) {
+        boolean isGaragePartner = (currentUser.getRole() == com.madgarage.api.enums.Role.ROLE_GARAGE || currentUser.getRole() == com.madgarage.api.enums.Role.ROLE_ADMIN) 
+            && order.getFittingGarageId() != null 
+            && order.getFittingGarageId().equals(currentUser.getId());
+
+        if (!isAdmin && !isOwner && !ownsAnyItem && !isGaragePartner) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied.");
         }
     }

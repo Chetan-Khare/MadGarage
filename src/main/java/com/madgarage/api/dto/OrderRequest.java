@@ -15,6 +15,9 @@ public class OrderRequest {
     private String state;
     private String pincode;
 
+    private String deliveryType;
+    private Long fittingGarageId;
+
     @Data
     public static class CartItemDto {
         private Long productId;
