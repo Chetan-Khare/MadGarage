@@ -129,6 +129,7 @@ public class InvoiceService {
         double subtotal = order.getSubtotal() != null ? order.getSubtotal() : 0.0;
         double tax = order.getTaxAmount() != null ? order.getTaxAmount() : 0.0;
         double shipping = order.getShippingFee() != null ? order.getShippingFee() : 0.0;
+        double platform = order.getPlatformFee() != null ? order.getPlatformFee() : 0.0;
         double grandTotal = order.getGrandTotal() != null ? order.getGrandTotal() : 0.0;
 
         PdfPCell summaryCell = new PdfPCell();
@@ -142,6 +143,10 @@ public class InvoiceService {
         Paragraph pShip = new Paragraph("Shipping: INR " + String.format("%.2f", shipping), normalFont);
         pShip.setAlignment(Element.ALIGN_RIGHT);
         summaryCell.addElement(pShip);
+
+        Paragraph pPlat = new Paragraph("Platform Fee: INR " + String.format("%.2f", platform), normalFont);
+        pPlat.setAlignment(Element.ALIGN_RIGHT);
+        summaryCell.addElement(pPlat);
         
         Paragraph pGrand = new Paragraph("Grand Total: INR " + String.format("%.2f", grandTotal), headerFont);
         pGrand.setAlignment(Element.ALIGN_RIGHT);
