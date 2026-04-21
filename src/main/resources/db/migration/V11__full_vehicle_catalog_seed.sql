@@ -9,6 +9,9 @@ INSERT IGNORE INTO makes (name) VALUES
 ('Toyota'), ('Skoda'), ('Volkswagen'), ('Honda'), ('MG'), 
 ('Renault'), ('Nissan'), ('Citroen'), ('Jeep');
 
+
+
+
 -- 2. SEED MODELS
 -- TATA
 INSERT IGNORE INTO models (name, make_id) SELECT 'Nexon', id FROM makes WHERE name = 'Tata';

@@ -26,6 +26,9 @@ public class OrderService {
     @Value("${app.pricing.shipping-fee:250.0}")
     private double shippingFee;
 
+    @Value("${app.pricing.platform-fee:7.0}")
+    private double platformFee;
+
     public List<OrderResponse> getCustomerOrders(User customer) {
         // ARCH-03 FIX: Uses JOIN FETCH to load everything in one SQL query
         List<Order> rawOrders = orderRepository.findByUserWithItems(customer);
@@ -95,7 +98,7 @@ public class OrderService {
                     .sum();
             taxAmount = 0.0; // Tax is already included in product price
             shipFee = 0.0; // Shipping info is for the customer/admin view
-            grandTotal = subtotal;
+            grandTotal = subtotal; // Sellers don't receive the platform fee
         }
 
         OrderResponse.OrderResponseBuilder builder = OrderResponse.builder()
@@ -104,6 +107,7 @@ public class OrderService {
                 .subtotal(subtotal)
                 .taxAmount(taxAmount)
                 .shippingFee(shipFee)
+                .platformFee(order.getPlatformFee() != null ? order.getPlatformFee() : 0.0)
                 .grandTotal(grandTotal)
                 .status(order.getStatus())
                 .orderDate(order.getOrderDate())
@@ -175,13 +179,14 @@ public class OrderService {
         }
 
         double taxAmount = 0.0; // Tax is already included in product price
-        double grandTotal = subtotal + shippingFee;
+        double grandTotal = subtotal + shippingFee + platformFee;
 
         Order order = Order.builder()
                 .user(customer)
                 .subtotal(subtotal)
                 .taxAmount(taxAmount)
                 .shippingFee(shippingFee)
+                .platformFee(platformFee)
                 .grandTotal(grandTotal)
                 .status("PAID")
                 .orderDate(LocalDateTime.now())

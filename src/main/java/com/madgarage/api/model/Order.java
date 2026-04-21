@@ -27,6 +27,7 @@ public class Order {
     private Double subtotal;
     private Double taxAmount;
     private Double shippingFee;
+    private Double platformFee;
     private Double grandTotal;
     private String status;
     private LocalDateTime orderDate;
