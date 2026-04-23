@@ -9,6 +9,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
+import com.madgarage.api.exceptions.RateLimitExceededException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -49,6 +52,22 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleResponseStatus(ResponseStatusException ex) {
         return ResponseEntity.status(ex.getStatusCode())
                 .body(Map.of("error", ex.getReason() != null ? ex.getReason() : ex.getMessage()));
+    }
+
+    /**
+     * Handles Rate Limit violations by communicating wait times to the client via Retry-After.
+     */
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<Object> handleRateLimit(RateLimitExceededException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("message", ex.getMessage());
+        body.put("status", HttpStatus.TOO_MANY_REQUESTS.value());
+        body.put("retryAfterSeconds", ex.getWaitTimeSeconds());
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Retry-After", String.valueOf(ex.getWaitTimeSeconds()));
+        
+        return new ResponseEntity<>(body, headers, HttpStatus.TOO_MANY_REQUESTS);
     }
 
     /**

@@ -12,9 +12,9 @@ import java.util.Map;
 
 /**
  * Global API Exception Handler.
- * Transparently manages security violations and rate limits.
+ * DEACTIVATED: Logic merged into com.madgarage.api.config.GlobalExceptionHandler to resolve bean conflicts.
  */
-@ControllerAdvice
+// @ControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(RateLimitExceededException.class)
