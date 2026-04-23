@@ -20,6 +20,7 @@ public class UserProfileUpdateRequest {
 
     private String address;
     private String city;
+    private String phone;
     private Double latitude;
     private Double longitude;
 }

@@ -28,4 +28,5 @@ public class Base64ProductRequest {
     private Boolean isManualRating;
     private Double rating;
     private String flagReason;
+    private Boolean wholesale;
 }

@@ -29,6 +29,7 @@ public class ProductController {
     }
 
     @GetMapping("/garage")
+    @PreAuthorize("hasAnyRole('GARAGE', 'ADMIN')")
     public List<GarageProductDTO> getGarageProducts(@RequestParam(required = false) String category,
                                                     @RequestParam(required = false) Long vehicleId) {
         return productService.getGarageProducts(category, vehicleId);

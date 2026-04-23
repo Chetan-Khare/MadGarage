@@ -64,4 +64,13 @@ public class OtpService {
                     }
                 }).orElse(false);
     }
+
+    /**
+     * COST OPTIMIZATION: Runs daily to purge zombie OTP records from the database.
+     */
+    @org.springframework.scheduling.annotation.Scheduled(cron = "0 0 0 * * *") // Run at midnight every day
+    @Transactional
+    public void purgeExpiredOtps() {
+        otpRepository.deleteByExpiryTimeBefore(LocalDateTime.now());
+    }
 }

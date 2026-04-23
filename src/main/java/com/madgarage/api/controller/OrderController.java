@@ -27,12 +27,14 @@ public class OrderController {
     private final OrderService orderService;
     private final InvoiceService invoiceService;
     private final UserService userService;
+    private final com.madgarage.api.services.OrderMapper orderMapper;
     private static final Logger logger = LoggerFactory.getLogger(OrderController.class);
 
-    public OrderController(OrderService orderService, InvoiceService invoiceService, UserService userService) {
+    public OrderController(OrderService orderService, InvoiceService invoiceService, UserService userService, com.madgarage.api.services.OrderMapper orderMapper) {
         this.orderService = orderService;
         this.invoiceService = invoiceService;
         this.userService = userService;
+        this.orderMapper = orderMapper;
     }
 
     @GetMapping("/my-orders")
@@ -59,6 +61,18 @@ public class OrderController {
     public ResponseEntity<?> checkout(Principal principal, @Valid @RequestBody OrderRequest request) {
         User customer = userService.getCurrentUser(principal.getName());
         OrderResponse response = orderService.placeOrder(customer, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{orderId:[0-9]+}/verify-payment")
+    public ResponseEntity<?> verifyPayment(Principal principal, @PathVariable Long orderId, @RequestParam String paymentId, @RequestParam String signature) {
+        User customer = userService.getCurrentUser(principal.getName());
+        Order order = orderService.getOrderById(orderId);
+        
+        if (order == null) return ResponseEntity.notFound().build();
+        assertOrderAccess(order, customer);
+        
+        OrderResponse response = orderService.verifyPayment(orderId, paymentId, signature);
         return ResponseEntity.ok(response);
     }
 
@@ -95,7 +109,7 @@ public class OrderController {
 
         assertOrderAccess(order, customer);
 
-        OrderResponse response = orderService.mapToOrderResponse(order, customer);
+        OrderResponse response = orderMapper.mapToOrderResponse(order, customer);
         return ResponseEntity.ok(response);
     }
 
@@ -106,8 +120,24 @@ public class OrderController {
         return ResponseEntity.ok().build();
     }
 
+    @PatchMapping("/{orderId:[0-9]+}/fitting-status")
+    @PreAuthorize("hasRole('GARAGE') or hasRole('ADMIN')")
+    public ResponseEntity<?> updateFittingStatus(Principal principal, @PathVariable Long orderId, @RequestParam String status) {
+        User requester = userService.getCurrentUser(principal.getName());
+        Order order = orderService.getOrderById(orderId);
+
+        if (order == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        assertOrderAccess(order, requester);
+
+        OrderResponse response = orderService.updateFittingStatus(orderId, status);
+        return ResponseEntity.ok(response);
+    }
+
     @PutMapping("/{orderId:[0-9]+}/status")
-    @PreAuthorize("hasAnyRole('SELLER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SELLER', 'ADMIN', 'GARAGE')")
     public ResponseEntity<?> updateOrderStatus(Principal principal, @PathVariable Long orderId, @RequestParam String status) {
         User requester = userService.getCurrentUser(principal.getName());
         Order order = orderService.getOrderById(orderId);

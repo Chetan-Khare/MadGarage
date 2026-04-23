@@ -43,6 +43,11 @@ public class Order {
     private Long fittingGarageId;
     private String fittingStatus; // NONE, PENDING_INSPECTION, INSPECTED, FITTED
 
+    // Payment Verification Terminal
+    private String paymentId;
+    private String paymentSignature;
+    private boolean paymentVerified;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     @ToString.Exclude

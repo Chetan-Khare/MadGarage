@@ -29,4 +29,5 @@ public class ProductResponse {
     private String sellerResponse;
     private boolean isManualRating;
     private Double rating;
+    private boolean wholesale;
 }

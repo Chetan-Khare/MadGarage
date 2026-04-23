@@ -33,11 +33,27 @@ public class AuthService {
     private final JwtService jwtService;
     private final OtpService otpService;
     private final AuthenticationManager authenticationManager;
+    private final RateLimitingService rateLimitingService;
 
     /**
      * Generates and logs an OTP for the given phone number.
+     * Enforces strict rate limits by Phone (Cost Control) and IP (Bot Prevention).
      */
-    public void sendOtp(OtpRequest request) {
+    public void sendOtp(OtpRequest request, String ip) {
+        io.github.bucket4j.ConsumptionProbe phoneProbe = rateLimitingService.probeOtpByPhone(request.getPhone());
+        if (!phoneProbe.isConsumed()) {
+            long waitTime = phoneProbe.getNanosToWaitForRefill() / 1_000_000_000L;
+            log.warn("[Auth] OTP Rate Limit EXCEEDED for phone: {}. Wait: {}s", request.getPhone(), waitTime);
+            throw new com.madgarage.api.exceptions.RateLimitExceededException("Too many requests for this number. Please wait.", waitTime);
+        }
+
+        io.github.bucket4j.ConsumptionProbe ipProbe = rateLimitingService.probeOtpByIp(ip);
+        if (!ipProbe.isConsumed()) {
+            long waitTime = ipProbe.getNanosToWaitForRefill() / 1_000_000_000L;
+            log.warn("[Auth] OTP Rate Limit EXCEEDED for IP: {}. Wait: {}s", ip, waitTime);
+            throw new com.madgarage.api.exceptions.RateLimitExceededException("Too many requests from this device. Please wait.", waitTime);
+        }
+
         otpService.generateOtp(request.getPhone());
     }
 
@@ -46,9 +62,21 @@ public class AuthService {
      * Returns an AuthResponse containing either a login JWT or a registrationToken.
      */
     public AuthResponse verifyOtp(OtpVerificationRequest request) {
-        if (!otpService.verifyOtp(request.getPhone(), request.getOtp())) {
+        String phone = request.getPhone();
+        
+        io.github.bucket4j.ConsumptionProbe probe = rateLimitingService.probeAuthAttempt(phone);
+        if (!probe.isConsumed()) {
+            long waitTime = probe.getNanosToWaitForRefill() / 1_000_000_000L;
+            log.warn("[Auth] Brute-force protection: Blocking attempt for phone: {}. Wait: {}s", phone, waitTime);
+            throw new com.madgarage.api.exceptions.RateLimitExceededException("Too many failed attempts. Account locked temporarily.", waitTime);
+        }
+
+        if (!otpService.verifyOtp(phone, request.getOtp())) {
+            rateLimitingService.recordAuthFailure(phone);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired OTP.");
         }
+
+        rateLimitingService.resetAuthAttempts(phone);
 
         Optional<User> userOptional = userRepository.findByPhone(request.getPhone());
         if (userOptional.isPresent()) {
@@ -154,15 +182,23 @@ public class AuthService {
         String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
         log.info("[Auth] Login attempt initiated for canonicalized email: [{}]", email);
         
+        io.github.bucket4j.ConsumptionProbe probe = rateLimitingService.probeAuthAttempt(email);
+        if (!probe.isConsumed()) {
+            long waitTime = probe.getNanosToWaitForRefill() / 1_000_000_000L;
+            log.warn("[Auth] Brute-force protection: Blocking login for email: [{}]. Wait: {}s", email, waitTime);
+            throw new com.madgarage.api.exceptions.RateLimitExceededException("Account locked due to multiple failed attempts.", waitTime);
+        }
+        
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(email, request.getPassword())
             );
         } catch (AuthenticationException e) {
-
-            
+            rateLimitingService.recordAuthFailure(email);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password.");
         }
+
+        rateLimitingService.resetAuthAttempts(email);
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> {

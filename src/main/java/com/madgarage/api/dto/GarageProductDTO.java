@@ -16,4 +16,5 @@ public class GarageProductDTO {
     private Integer stockQuantity;
     private List<String> imageUrls;
     private Double rating;
+    private boolean wholesale;
 }

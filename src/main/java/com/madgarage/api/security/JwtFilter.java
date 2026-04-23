@@ -28,20 +28,23 @@ public class JwtFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // 1. Look for the "Authorization" header in the incoming request
+        // 1. Unified Token Extraction (Header vs Cookie)
+        String token = null;
         final String authHeader = request.getHeader("Authorization");
 
-        // 2. If there is no header, or it doesn't start with "Bearer ", move on
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
-            return;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7).trim();
+        } else if (request.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                if ("mg_auth".equals(cookie.getName())) {
+                    token = cookie.getValue();
+                    break;
+                }
+            }
         }
 
-        // 3. Extract the token and clean off any invisible spaces
-        final String token = authHeader.substring(7).trim();
-
-        // 🛑 THE NEW GUARDRAIL: Block literal "undefined", "null", or empty strings from React Native
-        if (token.isEmpty() || token.equals("null") || token.equals("undefined")) {
+        // 2. If no token is found, or it's a "junk" value from client state, pass through
+        if (token == null || token.isEmpty() || token.equals("null") || token.equals("undefined")) {
             filterChain.doFilter(request, response);
             return;
         }

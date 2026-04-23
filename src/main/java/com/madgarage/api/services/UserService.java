@@ -105,6 +105,15 @@ public class UserService {
             }
             user.setEmail(newEmail);
         }
+        if (request.getPhone() != null && !request.getPhone().isBlank()) {
+            String newPhone = request.getPhone().trim();
+            if (!newPhone.equals(user.getPhone())) {
+                if (userRepository.findByPhone(newPhone).isPresent()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Phone number is already registered to another account.");
+                }
+                user.setPhone(newPhone);
+            }
+        }
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             log.info("[Identity] Updating password for user: {}", user.getEmail());
             user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -177,8 +186,13 @@ public class UserService {
             byte[] imageBytes = java.util.Base64.getDecoder().decode(base64Data);
             
             String extension = (request.getExtension() != null && !request.getExtension().isBlank()) 
-                    ? request.getExtension().replaceAll("[^a-zA-Z0-9]", "") 
+                    ? request.getExtension().replaceAll("[^a-zA-Z0-9]", "").toLowerCase() 
                     : "jpg";
+            
+            java.util.List<String> allowedExtensions = java.util.Arrays.asList("jpg", "jpeg", "png", "webp");
+            if (!allowedExtensions.contains(extension)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid image extension: " + extension);
+            }
                     
             String fileUrl = fileStorageService.saveImage(imageBytes, extension);
             user.setProfileImageUrl(fileUrl);

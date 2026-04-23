@@ -55,6 +55,10 @@ public class Product {
     private Double manualRating;
     
     @Builder.Default
+    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private boolean wholesale = true;
+
+    @Builder.Default
     private boolean flagged = false;
 
     @Column(length = 1000)

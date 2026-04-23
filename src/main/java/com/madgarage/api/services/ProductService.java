@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final PricingService pricingService;
 
     // -----------------------------------------------------------------------
     // Queries
@@ -52,13 +53,13 @@ public class ProductService {
     public List<ProductResponse> getAllProducts(String category, Long vehicleId) {
         return fetchFilteredProducts(category, vehicleId).stream()
                 .filter(product -> !product.isFlagged())
-                .map(this::mapToResponse)
+                .map(product -> mapToResponse(product))
                 .collect(Collectors.toList());
     }
 
     /**
-     * Returns all products with garage-discounted pricing (5% off), optionally
-     * filtered by category.
+     * Returns all products with garage-discounted pricing using the tiered
+     * discount system, optionally filtered by category.
      */
     public List<GarageProductDTO> getGarageProducts(String category, Long vehicleId) {
         return fetchFilteredProducts(category, vehicleId).stream()
@@ -69,13 +70,13 @@ public class ProductService {
             dto.setName(product.getPartName());
             dto.setImageUrl(product.getImageUrl());
             dto.setOriginalPrice(product.getPrice());
-            double discounted = product.getPrice() * 0.95;
-            dto.setGaragePrice(Math.round(discounted * 100.0) / 100.0);
+            dto.setGaragePrice(pricingService.calculateGaragePrice(product));
             dto.setCondition(product.getCondition() != null ? product.getCondition().name() : "NEW");
             dto.setCategory(product.getCategory());
             dto.setBrand(product.getBrand());
             dto.setColor(product.getColor());
             dto.setStockQuantity(product.getStockQuantity());
+            dto.setWholesale(product.isWholesale());
             dto.setImageUrls(product.getImages() != null
                     ? product.getImages().stream().map(ProductImage::getImageUrl).collect(Collectors.toList())
                     : java.util.Collections.emptyList());
@@ -89,8 +90,8 @@ public class ProductService {
      */
     public List<ProductResponse> getAllProductsAsDto() {
         return productRepository.findAll().stream()
-                .map(this::mapToResponse)
-                .toList();
+                .map(product -> mapToResponse(product))
+                .collect(Collectors.toList());
     }
 
     // -----------------------------------------------------------------------
@@ -136,6 +137,7 @@ public class ProductService {
         if (request.getFlagged() != null) product.setFlagged(request.getFlagged());
         if (request.getFlagReason() != null) product.setFlagReason(request.getFlagReason());
         if (request.getSellerResponse() != null) product.setSellerResponse(request.getSellerResponse());
+        if (request.getWholesale() != null) product.setWholesale(request.getWholesale());
 
         productRepository.save(product);
     }
@@ -199,6 +201,7 @@ public class ProductService {
                         : java.util.Collections.emptyList())
                 .isManualRating(product.isManualRatingOverride())
                 .rating(product.isManualRatingOverride() ? product.getManualRating() : 4.8)
+                .wholesale(product.isWholesale())
                 .build();
     }
 }

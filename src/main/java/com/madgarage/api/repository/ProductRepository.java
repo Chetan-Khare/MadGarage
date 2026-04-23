@@ -3,6 +3,7 @@ package com.madgarage.api.repository;
 import com.madgarage.api.enums.FitmentCategory;
 import com.madgarage.api.model.Product;
 import com.madgarage.api.model.User;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +14,7 @@ import java.util.List;
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
+        @EntityGraph(attributePaths = {"images"})
         @Query("SELECT p FROM Product p JOIN p.fittedVehicles v " +
                         "WHERE v.carModel.make.name = :makeName " +
                         "AND v.carModel.name = :modelName " +
@@ -30,13 +32,20 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                         @Param("engineType") String engineType,
                         @Param("partCategory") String partCategory);
 
+        @EntityGraph(attributePaths = {"images"})
         List<Product> findByFittedVehiclesId(Long vehicleId);
 
+        @EntityGraph(attributePaths = {"images"})
         List<Product> findByCategoryAndFittedVehiclesId(String category, Long vehicleId);
 
+        @EntityGraph(attributePaths = {"images"})
         List<Product> findByFitmentCategory(FitmentCategory fitmentCategory);
+
+        @EntityGraph(attributePaths = {"images"})
+        List<Product> findAll();
 
         long countBySeller(User seller);
 
+        @EntityGraph(attributePaths = {"images"})
         List<Product> findBySeller(User seller);
 }

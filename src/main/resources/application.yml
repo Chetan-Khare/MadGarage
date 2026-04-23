@@ -4,8 +4,8 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 100MB
-      max-request-size: 500MB
+      max-file-size: 10MB
+      max-request-size: 50MB
 
   # Database Setup (MySQL 8.0)
   datasource:
@@ -53,10 +53,16 @@ server:
     max-http-form-post-size: -1
     max-swallow-size: -1
 
+  # Cost Optimization: Enable GZIP compression to reduce JSON payload size by ~70%
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+    min-response-size: 1024
+
 logging:
   level:
-    org.apache.tomcat: DEBUG
-    org.springframework.web.multipart: DEBUG
+    org.apache.tomcat: INFO
+    org.springframework.web.multipart: INFO
 
 # P1 FIX: JWT secret has NO fallback value.
 # The app will throw IllegalArgumentException on startup if JWT_SECRET env var is missing.

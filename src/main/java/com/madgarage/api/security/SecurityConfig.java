@@ -93,7 +93,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/requests").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/seller/**").hasAnyRole("SELLER", "ADMIN")
-                        .requestMatchers("/api/products/garage").permitAll()
+                        .requestMatchers("/api/products/garage").hasAnyRole("GARAGE", "ADMIN")
                         .requestMatchers("/api/products/**").permitAll()
                         // Web Routes (Integrated)
                         .requestMatchers("/", "/catalog", "/receipt/**").permitAll()

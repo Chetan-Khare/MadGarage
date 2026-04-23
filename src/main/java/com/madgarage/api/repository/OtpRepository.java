@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface OtpRepository extends JpaRepository<Otp, Long> {
     Optional<Otp> findTopByPhoneOrderByCreatedAtDesc(String phone);
     void deleteByPhone(String phone);
+    void deleteByExpiryTimeBefore(java.time.LocalDateTime time);
 }

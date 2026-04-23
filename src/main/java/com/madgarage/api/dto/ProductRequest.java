@@ -24,4 +24,5 @@ public class ProductRequest {
     private Boolean flagged;
     private String flagReason;
     private String sellerResponse;
+    private Boolean wholesale;
 }

@@ -173,6 +173,7 @@ public class ProductCreationService {
                     .sellerResponse(request.getSellerResponse())
                     .flagged(request.getFlagged() != null ? request.getFlagged() : false)
                     .flagReason(request.getFlagReason())
+                    .wholesale(request.getWholesale() != null ? request.getWholesale() : true)
                     .build();
 
             for (ProductImage pi : productImages) {
@@ -255,6 +256,7 @@ public class ProductCreationService {
             if (request.getSellerResponse() != null) product.setSellerResponse(request.getSellerResponse());
             if (request.getFlagged() != null) product.setFlagged(request.getFlagged());
             if (request.getFlagReason() != null) product.setFlagReason(request.getFlagReason());
+            if (request.getWholesale() != null) product.setWholesale(request.getWholesale());
 
             productRepository.save(product);
 

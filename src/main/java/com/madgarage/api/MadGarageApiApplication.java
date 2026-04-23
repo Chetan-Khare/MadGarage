@@ -6,6 +6,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
+@org.springframework.cache.annotation.EnableCaching
+@org.springframework.scheduling.annotation.EnableScheduling
 public class MadGarageApiApplication {
 
 	public static void main(String[] args) {
@@ -18,8 +20,8 @@ public class MadGarageApiApplication {
 
 	@Bean
 	public jakarta.servlet.MultipartConfigElement multipartConfigElement() {
-		// Programmatic override for upload limits (100MB file / 500MB request)
+		// Programmatic override for upload limits (10MB file / 50MB request)
 		// This explicitly sets the limits at the Servlet level.
-		return new jakarta.servlet.MultipartConfigElement("", 104857600L, 524288000L, 0);
+		return new jakarta.servlet.MultipartConfigElement("", 10485760L, 52428800L, 0);
 	}
 }
