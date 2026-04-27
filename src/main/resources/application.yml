@@ -81,5 +81,8 @@ app:
   pricing:
     shipping-fee: 250.0
     garage-discount: 0.05
+  razorpay:
+    key-id: ${RAZORPAY_KEY_ID}
+    key-secret: ${RAZORPAY_KEY_SECRET}
 
 # END OF FILE

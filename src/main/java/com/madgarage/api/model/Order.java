@@ -47,6 +47,7 @@ public class Order {
     private String fittingStatus; // NONE, PENDING_INSPECTION, INSPECTED, FITTED
 
     // Payment Verification Terminal
+    private String razorpayOrderId;
     private String paymentId;
     private String paymentSignature;
     private boolean paymentVerified;

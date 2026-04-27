@@ -7,6 +7,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
+import com.madgarage.api.enums.OrderStatus;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,7 +35,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            "ORDER BY o.id DESC")
     List<Order> findByUserWithItems(@Param("user") User user);
 
-    @Query("SELECT o FROM Order o JOIN FETCH o.user LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product p WHERE o.fittingGarageId = :garageId ORDER BY o.orderDate DESC")
+    @Query("SELECT o FROM Order o JOIN FETCH o.user LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product p WHERE o.fittingGarageId = :garageId AND o.status <> 'PENDING_PAYMENT' ORDER BY o.orderDate DESC")
     List<Order> findByFittingGarageIdWithItems(@Param("garageId") Long garageId);
 
     @Query("SELECT SUM(oi.priceAtPurchase * oi.quantity) FROM OrderItem oi " +
@@ -51,6 +55,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            "JOIN FETCH o.items i " +
            "JOIN FETCH i.product p " +
            "WHERE p.seller = :seller " +
+           "AND o.status <> 'PENDING_PAYMENT' " +
            "ORDER BY o.id DESC")
     List<Order> findAllBySeller(@Param("seller") User seller);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM Order o WHERE o.id = :id")
+    Optional<Order> findByIdWithLock(@Param("id") Long id);
+
+    List<Order> findByStatusAndOrderDateBefore(OrderStatus status, LocalDateTime cutoff);
 }

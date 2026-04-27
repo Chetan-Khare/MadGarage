@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.security.Principal;
+import java.util.Map;
 
 /**
  * OrderController is a thin HTTP routing layer.
@@ -62,9 +63,29 @@ public class OrderController {
     @PostMapping("/checkout")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'GARAGE', 'ADMIN')")
     public ResponseEntity<?> checkout(Principal principal, @Valid @RequestBody OrderRequest request) {
+        try {
+            User customer = userService.getCurrentUser(principal.getName());
+            OrderResponse response = orderService.placeOrder(customer, request);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("message", e.getMessage() != null ? e.getMessage() : "Internal Server Error"));
+        }
+    }
+
+    @PostMapping("/{orderId:[0-9]+}/rzp-id")
+    public ResponseEntity<?> setRazorpayOrderId(Principal principal, @PathVariable Long orderId, @RequestParam String rzpOrderId) {
+        // L-01 FIX: Validate Razorpay Order ID format before storing
+        if (rzpOrderId == null || !rzpOrderId.matches("order_[A-Za-z0-9]+")) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid Razorpay Order ID format."));
+        }
         User customer = userService.getCurrentUser(principal.getName());
-        OrderResponse response = orderService.placeOrder(customer, request);
-        return ResponseEntity.ok(response);
+        Order order = orderService.getOrderById(orderId);
+        if (order == null || !order.getUser().getId().equals(customer.getId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        orderService.setRazorpayOrderId(orderId, rzpOrderId);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{orderId:[0-9]+}/verify-payment")
