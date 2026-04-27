@@ -76,16 +76,15 @@ public class AdminController {
     }
 
     @PutMapping("/orders/{id}/status")
-    public ResponseEntity<OrderResponse> updateOrderStatus(@PathVariable Long id,
+    public ResponseEntity<OrderResponse> updateOrderStatus(java.security.Principal principal, @PathVariable Long id,
             @RequestBody java.util.Map<String, String> body) {
         String newStatus = body.get("status");
         if (newStatus == null || newStatus.trim().isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
         
-        // Validation check is now handled centrally in the OrderService implementation
-        // but we ensure clean input here as well if necessary.
-        return ResponseEntity.ok(orderService.updateOrderStatus(id, newStatus));
+        com.madgarage.api.model.User admin = userService.getCurrentUser(principal.getName());
+        return ResponseEntity.ok(orderService.updateOrderStatus(id, newStatus, admin));
     }
 
     @DeleteMapping("/orders/{id}")

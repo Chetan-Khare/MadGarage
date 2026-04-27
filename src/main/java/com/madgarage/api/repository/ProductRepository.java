@@ -5,6 +5,9 @@ import com.madgarage.api.model.Product;
 import com.madgarage.api.model.User;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -14,7 +17,11 @@ import java.util.List;
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
-        @EntityGraph(attributePaths = {"images"})
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Product p WHERE p.id = :id")
+    Optional<Product> findByIdWithLock(@Param("id") Long id);
+
+    @EntityGraph(attributePaths = {"images"})
         @Query("SELECT p FROM Product p JOIN p.fittedVehicles v " +
                         "WHERE v.carModel.make.name = :makeName " +
                         "AND v.carModel.name = :modelName " +

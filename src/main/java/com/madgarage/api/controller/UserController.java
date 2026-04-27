@@ -6,6 +6,7 @@ import com.madgarage.api.model.User;
 import com.madgarage.api.services.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,6 +18,7 @@ import java.security.Principal;
  */
 @RestController
 @RequestMapping("/api/users")
+@PreAuthorize("isAuthenticated()")
 public class UserController {
 
     private final UserService userService;

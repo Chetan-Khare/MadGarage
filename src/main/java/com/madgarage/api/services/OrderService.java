@@ -10,6 +10,9 @@ import com.madgarage.api.repository.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.madgarage.api.enums.Role;
+import com.madgarage.api.enums.OrderStatus;
+import com.madgarage.api.enums.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 import java.time.LocalDateTime;
@@ -63,7 +66,7 @@ public class OrderService {
     }
 
 
-    @Transactional // If anything fails, it rolls back the whole database transaction
+    @Transactional
     public OrderResponse placeOrder(User customer, OrderRequest request) {
         double subtotal = 0.0;
         List<OrderItem> orderItems = new ArrayList<>();
@@ -73,14 +76,15 @@ public class OrderService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid quantity.");
             }
 
-            Product product = productRepository.findById(itemDto.getProductId())
+            // SEC-09 FIX: Use Pessimistic Lock to prevent overselling during high-concurrency spikes
+            Product product = productRepository.findByIdWithLock(itemDto.getProductId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found: " + itemDto.getProductId()));
 
             if (product.getStockQuantity() < itemDto.getQuantity()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Not enough stock for: " + product.getPartName());
             }
 
-            // Deduct stock
+            // Deduct stock safely within the locked transaction
             product.setStockQuantity(product.getStockQuantity() - itemDto.getQuantity());
             productRepository.save(product);
 
@@ -116,7 +120,7 @@ public class OrderService {
                 .shippingFee(currentShippingFee)
                 .platformFee(currentPlatformFee)
                 .grandTotal(grandTotal)
-                .status("PENDING_PAYMENT")
+                .status(OrderStatus.PENDING_PAYMENT)
                 .orderDate(LocalDateTime.now())
                 .shippingAddress(request.getShippingAddress())
                 .city(request.getCity())
@@ -143,7 +147,7 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found."));
 
-        if (!"PENDING_PAYMENT".equals(order.getStatus())) {
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order is not in pending payment state.");
         }
 
@@ -155,7 +159,7 @@ public class OrderService {
             throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Security Verification Failed: Tampered payment signature detected.");
         }
 
-        order.setStatus("PAID");
+        order.setStatus(OrderStatus.PAID);
         order.setPaymentId(paymentId);
         order.setPaymentSignature(signature);
         order.setPaymentVerified(true);
@@ -178,28 +182,68 @@ public class OrderService {
         return orderRepository.findByIdWithUser(id).orElse(null);
     }
 
-    private static final java.util.List<String> ALLOWED_STATUSES = java.util.Arrays.asList("PENDING", "PAID", "SHIPPED", "ARRIVED_AT_GARAGE", "DELIVERED", "CANCELLED");
-
-    public OrderResponse updateOrderStatus(Long orderId, String newStatus) {
+    @Transactional
+    public OrderResponse updateOrderStatus(Long orderId, String newStatus, User requester) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found."));
         
-        String canonicalStatus = newStatus.toUpperCase().trim();
-        if (!ALLOWED_STATUSES.contains(canonicalStatus)) {
+        OrderStatus currentStatus = order.getStatus();
+        OrderStatus targetStatus;
+        try {
+            targetStatus = OrderStatus.valueOf(newStatus.toUpperCase().trim());
+        } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid status value: " + newStatus);
         }
 
-        order.setStatus(canonicalStatus);
-        orderRepository.save(order);
+        if (currentStatus == targetStatus) return orderMapper.mapToOrderResponse(order, order.getUser());
+
+        // 1. Verify the transition is mathematically valid
+        if (!isValidTransition(currentStatus, targetStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Invalid state transition from " + currentStatus + " to " + targetStatus);
+        }
+
+        // 2. Verify the user has the AUTHORITY to make THIS specific transition
+        if (!hasAuthorityForTransition(requester.getRole(), currentStatus, targetStatus)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User role " + requester.getRole() + " is not authorized to transition order to " + targetStatus);
+        }
+
+        // Action: Restore stock if cancelling
+        if (targetStatus == OrderStatus.CANCELLED) {
+            restoreStock(order);
+        }
+
+        order.setStatus(targetStatus);
+        order = orderRepository.save(order);
         return orderMapper.mapToOrderResponse(order, order.getUser());
     }
 
-    @Transactional
-    public void deleteOrder(Long orderId) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found."));
-        
-        // Restore stock when an order is completely deleted (optional business rule, but logical for an inventory system)
+    private boolean isValidTransition(OrderStatus current, OrderStatus target) {
+        return switch (current) {
+            case PENDING_PAYMENT -> target == OrderStatus.PAID || target == OrderStatus.CANCELLED;
+            case PAID -> target == OrderStatus.PROCESSING || target == OrderStatus.CANCELLED || target == OrderStatus.SHIPPED;
+            case PROCESSING -> target == OrderStatus.SHIPPED || target == OrderStatus.CANCELLED;
+            case SHIPPED -> target == OrderStatus.ARRIVED_AT_GARAGE || target == OrderStatus.DELIVERED || target == OrderStatus.CANCELLED;
+            case ARRIVED_AT_GARAGE -> target == OrderStatus.DELIVERED || target == OrderStatus.CANCELLED;
+            case DELIVERED -> false; // Final state
+            case CANCELLED -> false; // Final state
+        };
+    }
+
+    private boolean hasAuthorityForTransition(Role role, OrderStatus current, OrderStatus target) {
+        if (role == Role.ROLE_ADMIN) return true;
+
+        return switch (target) {
+            case PAID -> false; // Only via system verifyPayment hook
+            case PROCESSING -> role == Role.ROLE_SELLER;
+            case SHIPPED -> role == Role.ROLE_SELLER;
+            case ARRIVED_AT_GARAGE -> role == Role.ROLE_GARAGE;
+            case DELIVERED -> role == Role.ROLE_SELLER || role == Role.ROLE_GARAGE;
+            case CANCELLED -> (role == Role.ROLE_CUSTOMER && current == OrderStatus.PENDING_PAYMENT);
+            default -> false;
+        };
+    }
+
+    private void restoreStock(Order order) {
         for (OrderItem item : order.getItems()) {
             if (item.getProduct() != null) {
                 Product p = item.getProduct();
@@ -207,7 +251,14 @@ public class OrderService {
                 productRepository.save(p);
             }
         }
+    }
+
+    @Transactional
+    public void deleteOrder(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found."));
         
+        restoreStock(order);
         orderRepository.delete(order);
     }
 
@@ -243,10 +294,10 @@ public class OrderService {
         
         // If the garage marks it as arrived, we update the main status too
         if ("ARRIVED_AT_GARAGE".equals(canonical)) {
-            order.setStatus("ARRIVED_AT_GARAGE");
+            order.setStatus(OrderStatus.ARRIVED_AT_GARAGE);
             order.setFittingStatus("PENDING_INSPECTION");
         } else if ("COMPLETED".equals(canonical)) {
-            order.setStatus("DELIVERED");
+            order.setStatus(OrderStatus.DELIVERED);
             order.setFittingStatus("COMPLETED");
         } else {
             order.setFittingStatus(canonical);

@@ -7,6 +7,8 @@ import com.madgarage.api.model.Product;
 import com.madgarage.api.model.ProductImage;
 import com.madgarage.api.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -50,6 +52,7 @@ public class ProductService {
     /**
      * Returns all products, optionally filtered by fitment category.
      */
+    @Cacheable(value = "products", key = "{#category, #vehicleId}")
     public List<ProductResponse> getAllProducts(String category, Long vehicleId) {
         return fetchFilteredProducts(category, vehicleId).stream()
                 .filter(product -> !product.isFlagged())
@@ -61,13 +64,14 @@ public class ProductService {
      * Returns all products with garage-discounted pricing using the tiered
      * discount system, optionally filtered by category.
      */
+    @Cacheable(value = "products_garage", key = "{#category, #vehicleId}")
     public List<GarageProductDTO> getGarageProducts(String category, Long vehicleId) {
         return fetchFilteredProducts(category, vehicleId).stream()
                 .filter(product -> !product.isFlagged())
                 .map(product -> {
             GarageProductDTO dto = new GarageProductDTO();
             dto.setId(product.getId());
-            dto.setName(product.getPartName());
+            dto.setPartName(product.getPartName());
             dto.setImageUrl(product.getImageUrl());
             dto.setOriginalPrice(product.getPrice());
             dto.setGaragePrice(pricingService.calculateGaragePrice(product));
@@ -101,6 +105,7 @@ public class ProductService {
     /**
      * Updates an existing product.
      */
+    @CacheEvict(value = {"products", "products_garage"}, allEntries = true)
     public void updateProduct(Long id, com.madgarage.api.dto.ProductRequest request) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
@@ -149,6 +154,7 @@ public class ProductService {
      * @param reason optional admin-provided reason for flagging (not yet persisted;
      *               add a flagReason field to Product to store it)
      */
+    @CacheEvict(value = {"products", "products_garage"}, allEntries = true)
     public boolean toggleProductFlag(Long id, String reason) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
@@ -162,6 +168,7 @@ public class ProductService {
     /**
      * Deletes a product.
      */
+    @CacheEvict(value = {"products", "products_garage"}, allEntries = true)
     public void deleteProduct(Long id) {
         if (!productRepository.existsById(id)) {
             throw new org.springframework.web.server.ResponseStatusException(

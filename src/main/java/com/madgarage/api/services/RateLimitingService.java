@@ -19,6 +19,19 @@ public class RateLimitingService {
     private final Map<String, Bucket> otpPhoneBuckets = new ConcurrentHashMap<>();
     private final Map<String, Bucket> otpIpBuckets = new ConcurrentHashMap<>();
     private final Map<String, Bucket> authFailureBuckets = new ConcurrentHashMap<>();
+    private final Map<String, Bucket> assistantBuckets = new ConcurrentHashMap<>();
+
+    /**
+     * Assistant Rule: Max 10 requests per 10 minutes per user/IP to control GenAI costs.
+     */
+    public ConsumptionProbe probeAssistant(String identifier) {
+        Bucket bucket = assistantBuckets.computeIfAbsent(identifier, key -> 
+            Bucket.builder()
+                .addLimit(Bandwidth.builder().capacity(10).refillIntervally(10, Duration.ofMinutes(10)).build())
+                .build()
+        );
+        return bucket.tryConsumeAndReturnRemaining(1);
+    }
 
     /**
      * Dual-Key Rule A: Max 3 OTP requests per 15 minutes per phone number.
@@ -47,14 +60,14 @@ public class RateLimitingService {
     /**
      * Brute-Force Key: Max 5 failed login/verify attempts per 15 minutes per identifier.
      */
-    public ConsumptionProbe probeAuthAttempt(String identifier) {
+    public io.github.bucket4j.EstimationProbe probeAuthAttempt(String identifier) {
         Bucket bucket = authFailureBuckets.computeIfAbsent(identifier, key -> 
             Bucket.builder()
                 .addLimit(Bandwidth.builder().capacity(5).refillIntervally(5, Duration.ofMinutes(15)).build())
                 .build()
         );
         // We probe without consuming (consumption only on failure)
-        return bucket.tryConsumeAndReturnRemaining(0);
+        return bucket.estimateAbilityToConsume(1);
     }
 
     public void recordAuthFailure(String identifier) {

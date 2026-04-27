@@ -64,8 +64,8 @@ public class AuthService {
     public AuthResponse verifyOtp(OtpVerificationRequest request) {
         String phone = request.getPhone();
         
-        io.github.bucket4j.ConsumptionProbe probe = rateLimitingService.probeAuthAttempt(phone);
-        if (!probe.isConsumed()) {
+        io.github.bucket4j.EstimationProbe probe = rateLimitingService.probeAuthAttempt(phone);
+        if (!probe.canBeConsumed()) {
             long waitTime = probe.getNanosToWaitForRefill() / 1_000_000_000L;
             log.warn("[Auth] Brute-force protection: Blocking attempt for phone: {}. Wait: {}s", phone, waitTime);
             throw new com.madgarage.api.exceptions.RateLimitExceededException("Too many failed attempts. Account locked temporarily.", waitTime);
@@ -182,8 +182,8 @@ public class AuthService {
         String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
         log.info("[Auth] Login attempt initiated for canonicalized email: [{}]", email);
         
-        io.github.bucket4j.ConsumptionProbe probe = rateLimitingService.probeAuthAttempt(email);
-        if (!probe.isConsumed()) {
+        io.github.bucket4j.EstimationProbe probe = rateLimitingService.probeAuthAttempt(email);
+        if (!probe.canBeConsumed()) {
             long waitTime = probe.getNanosToWaitForRefill() / 1_000_000_000L;
             log.warn("[Auth] Brute-force protection: Blocking login for email: [{}]. Wait: {}s", email, waitTime);
             throw new com.madgarage.api.exceptions.RateLimitExceededException("Account locked due to multiple failed attempts.", waitTime);

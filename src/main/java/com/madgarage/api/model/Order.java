@@ -1,5 +1,6 @@
 package com.madgarage.api.model;
 
+import com.madgarage.api.enums.OrderStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -29,7 +30,9 @@ public class Order {
     private Double shippingFee;
     private Double platformFee;
     private Double grandTotal;
-    private String status;
+
+    @Enumerated(EnumType.STRING)
+    private OrderStatus status;
     private LocalDateTime orderDate;
 
     // Shipping Details

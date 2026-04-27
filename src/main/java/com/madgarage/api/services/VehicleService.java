@@ -7,6 +7,8 @@ import com.madgarage.api.repository.CarModelRepository;
 import com.madgarage.api.repository.MakeRepository;
 import com.madgarage.api.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,26 +31,32 @@ public class VehicleService {
         return vehicleRepository.count();
     }
 
+    @Cacheable("vehicle_makes")
     public List<String> getMakes() {
         return vehicleRepository.findDistinctMakes();
     }
 
+    @Cacheable(value = "vehicle_models", key = "#make")
     public List<String> getModels(String make) {
         return vehicleRepository.findDistinctModelsByMake(make);
     }
 
+    @Cacheable(value = "vehicle_years", key = "#make + '-' + #model")
     public List<Integer> getYears(String make, String model) {
         return vehicleRepository.findDistinctYearsByMakeAndModel(make, model);
     }
 
+    @Cacheable(value = "vehicle_fuels", key = "#make + '-' + #model + '-' + #year")
     public List<String> getFuels(String make, String model, Integer year) {
         return vehicleRepository.findDistinctFuelsByMakeAndModelAndYear(make, model, year);
     }
 
+    @Cacheable(value = "vehicle_trims", key = "#make + '-' + #model + '-' + #year + '-' + #fuel")
     public List<String> getTrims(String make, String model, Integer year, String fuel) {
         return vehicleRepository.findDistinctTrimsByMakeAndModelAndYearAndFuel(make, model, year, fuel);
     }
 
+    @Cacheable(value = "vehicle_engines", key = "#make + '-' + #model + '-' + #year + '-' + #fuel + '-' + #trim")
     public List<String> getEngines(String make, String model, Integer year, String fuel, String trim) {
         return vehicleRepository.findDistinctEngineTypesByVariant(make, model, year, fuel, trim);
     }
@@ -58,6 +66,7 @@ public class VehicleService {
     }
 
     @Transactional
+    @CacheEvict(value = {"vehicle_makes", "vehicle_models", "vehicle_years", "vehicle_fuels", "vehicle_trims", "vehicle_engines"}, allEntries = true)
     public Vehicle addVehicle(Map<String, Object> body) {
         String makeName = (String) body.get("make");
         String modelName = (String) body.get("model");
@@ -93,6 +102,7 @@ public class VehicleService {
     }
 
     @Transactional
+    @CacheEvict(value = {"vehicle_makes", "vehicle_models", "vehicle_years", "vehicle_fuels", "vehicle_trims", "vehicle_engines"}, allEntries = true)
     public boolean deleteVehicle(Long id) {
         if (!vehicleRepository.existsById(id)) {
             return false;

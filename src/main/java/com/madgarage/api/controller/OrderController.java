@@ -22,6 +22,7 @@ import java.security.Principal;
  */
 @RestController
 @RequestMapping("/api/orders")
+@PreAuthorize("isAuthenticated()")
 public class OrderController {
 
     private final OrderService orderService;
@@ -38,6 +39,7 @@ public class OrderController {
     }
 
     @GetMapping("/my-orders")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'GARAGE', 'ADMIN')")
     public ResponseEntity<?> getMyOrders(Principal principal) {
         User customer = userService.getCurrentUser(principal.getName());
         return ResponseEntity.ok(orderService.getCustomerOrders(customer));
@@ -58,6 +60,7 @@ public class OrderController {
     }
 
     @PostMapping("/checkout")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'GARAGE', 'ADMIN')")
     public ResponseEntity<?> checkout(Principal principal, @Valid @RequestBody OrderRequest request) {
         User customer = userService.getCurrentUser(principal.getName());
         OrderResponse response = orderService.placeOrder(customer, request);
@@ -137,7 +140,7 @@ public class OrderController {
     }
 
     @PutMapping("/{orderId:[0-9]+}/status")
-    @PreAuthorize("hasAnyRole('SELLER', 'ADMIN', 'GARAGE')")
+    @PreAuthorize("hasAnyRole('SELLER', 'ADMIN', 'GARAGE', 'CUSTOMER')")
     public ResponseEntity<?> updateOrderStatus(Principal principal, @PathVariable Long orderId, @RequestParam String status) {
         User requester = userService.getCurrentUser(principal.getName());
         Order order = orderService.getOrderById(orderId);
@@ -148,7 +151,7 @@ public class OrderController {
 
         assertOrderAccess(order, requester);
 
-        OrderResponse response = orderService.updateOrderStatus(orderId, status);
+        OrderResponse response = orderService.updateOrderStatus(orderId, status, requester);
         return ResponseEntity.ok(response);
     }
 

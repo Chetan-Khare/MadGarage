@@ -11,6 +11,7 @@ import com.madgarage.api.model.Vehicle;
 import com.madgarage.api.repository.ProductRepository;
 import com.madgarage.api.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,7 @@ public class ProductCreationService {
     private final FileStorageService fileStorageService;
 
     @Transactional
+    @CacheEvict(value = {"products", "products_garage"}, allEntries = true)
     public void addProduct(User seller,
                            List<MultipartFile> images,
                            MultipartFile guide,
@@ -119,6 +121,7 @@ public class ProductCreationService {
     }
 
     @Transactional
+    @CacheEvict(value = {"products", "products_garage"}, allEntries = true)
     public void addProductBase64(User seller, Base64ProductRequest request) {
         try {
             List<ProductImage> productImages = new ArrayList<>();
@@ -190,6 +193,7 @@ public class ProductCreationService {
     }
 
     @Transactional
+    @CacheEvict(value = {"products", "products_garage"}, allEntries = true)
     public void updateProductBase64(User seller, Long productId, Base64ProductRequest request) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found."));
@@ -268,6 +272,7 @@ public class ProductCreationService {
     }
 
     @Transactional
+    @CacheEvict(value = {"products", "products_garage"}, allEntries = true)
     public boolean deleteSellerProduct(User seller, Long productId) {
         return productRepository.findById(productId)
                 .filter(p -> {
@@ -283,6 +288,7 @@ public class ProductCreationService {
     }
 
     @Transactional
+    @CacheEvict(value = {"products", "products_garage"}, allEntries = true)
     public boolean addSellerResponse(User seller, Long productId, String response) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found."));

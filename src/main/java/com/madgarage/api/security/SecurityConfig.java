@@ -87,7 +87,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/config/**").permitAll()
                         .requestMatchers("/api/health/**").permitAll()
-                        .requestMatchers("/api/assistant/**").permitAll()
+                        .requestMatchers("/api/assistant/**").authenticated()
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/api/vehicles/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/requests").permitAll()

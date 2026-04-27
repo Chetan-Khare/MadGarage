@@ -5,7 +5,7 @@ import java.util.List;
 @Data
 public class GarageProductDTO {
     private Long id;
-    private String name;
+    private String partName;
     private Double originalPrice;
     private Double garagePrice; // The 5% off price
     private String imageUrl;
