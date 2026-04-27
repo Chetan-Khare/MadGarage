@@ -4,7 +4,7 @@ spring:
 
   cache:
     type: caffeine
-    cache-names: vehicle_makes,vehicle_models,vehicle_years,vehicle_fuels,vehicle_trims,vehicle_engines,products,products_garage,settings
+    cache-names: vehicle_makes,vehicle_models,vehicle_years,vehicle_fuels,vehicle_trims,vehicle_engines,products,products_garage,settings,publicConfig
     caffeine:
       spec: maximumSize=500,expireAfterWrite=10m
 

@@ -22,17 +22,24 @@ public class PublicConfigController {
     }
 
     @GetMapping
-    @Cacheable(value = "publicConfig")
     public Map<String, String> getPublicConfig() {
-        List<SystemSetting> settings = settingRepository.findAll();
         Map<String, String> publicMap = new HashMap<>();
-        
-        // Filter and return only non-sensitive global settings
-        for (SystemSetting setting : settings) {
-            String key = setting.getConfigKey();
-            if (key.equals("SHIPPING_FEE") || key.equals("FREE_SHIPPING_THRESHOLD") || key.equals("PLATFORM_FEE")) {
-                publicMap.put(key, setting.getConfigValue());
+        try {
+            List<SystemSetting> settings = settingRepository.findAll();
+            
+            // Filter and return only non-sensitive global settings
+            for (SystemSetting setting : settings) {
+                String key = setting.getConfigKey();
+                if (key != null && (key.equals("SHIPPING_FEE") || key.equals("FREE_SHIPPING_THRESHOLD") || key.equals("PLATFORM_FEE"))) {
+                    publicMap.put(key, setting.getConfigValue());
+                }
             }
+        } catch (Exception e) {
+            // Log the error and return safe defaults to prevent app startup failure
+            System.err.println("Database error fetching public config: " + e.getMessage());
+            publicMap.put("SHIPPING_FEE", "250");
+            publicMap.put("FREE_SHIPPING_THRESHOLD", "400");
+            publicMap.put("PLATFORM_FEE", "7");
         }
         return publicMap;
     }
