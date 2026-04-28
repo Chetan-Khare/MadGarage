@@ -43,6 +43,7 @@ public class OrderResponse {
     private Integer deliveryRating;
     private String ratingComment;
 
+    private boolean active;
     private List<OrderItemResponse> items; // Added to map OrderItems securely
 
     @Data

@@ -206,7 +206,7 @@ public class UserService {
     /**
      * Creates a new B2B user (SELLER or GARAGE role) for the admin dashboard.
      */
-    public void createB2BUser(B2BUserRequest request) {
+    public void createB2BUser(B2BUserRequest request, User currentUser) {
         if (request.getEmail() == null || request.getEmail().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is required for new accounts.");
         }
@@ -226,11 +226,14 @@ public class UserService {
                 roleStr = "ROLE_" + roleStr;
             }
             newRole = Role.valueOf(roleStr);
-            if (newRole != Role.ROLE_SELLER && newRole != Role.ROLE_GARAGE && newRole != Role.ROLE_ADMIN) {
+            if (newRole != Role.ROLE_SELLER && newRole != Role.ROLE_GARAGE && newRole != Role.ROLE_ADMIN && newRole != Role.ROLE_WORKER) {
                 throw new IllegalArgumentException();
             }
+            if (currentUser.getRole() == Role.ROLE_WORKER && (newRole == Role.ROLE_ADMIN || newRole == Role.ROLE_WORKER)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Workers cannot create Administrative or Worker accounts.");
+            }
         } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid Role. Authorized roles are SELLER, GARAGE, or ADMIN.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid Role. Authorized roles are SELLER, GARAGE, WORKER, or ADMIN.");
         }
 
         // P2 FIX: Removed 'password123' security fallback. Admins must explicitly provide credentials for new accounts.
@@ -261,9 +264,13 @@ public class UserService {
      * Updates an existing user's record from the Administrative control panel.
      */
     @Transactional
-    public void updateUserByAdmin(Long id, B2BUserRequest request) {
+    public void updateUserByAdmin(Long id, B2BUserRequest request, User currentUser) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
+
+        if (currentUser.getRole() == Role.ROLE_WORKER && (user.getRole() == Role.ROLE_ADMIN || user.getRole() == Role.ROLE_WORKER)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Workers cannot modify Administrative or Worker accounts.");
+        }
 
         // P1 REQ: Names and Password are now STATIC for Admins. Only Email and Phone can be edited.
         

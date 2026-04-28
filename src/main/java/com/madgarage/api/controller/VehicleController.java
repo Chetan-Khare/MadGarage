@@ -69,13 +69,13 @@ public class VehicleController {
     // ─── Admin-only CRUD ──────────────────────────────────────────────────────
 
     @PostMapping("/admin")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('WORKER')")
     public ResponseEntity<Vehicle> addVehicle(@RequestBody Map<String, Object> body) {
         return ResponseEntity.ok(vehicleService.addVehicle(body));
     }
 
     @DeleteMapping("/admin/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('WORKER')")
     public ResponseEntity<?> deleteVehicle(@PathVariable Long id) {
         if (vehicleService.deleteVehicle(id)) {
             return ResponseEntity.ok().build();

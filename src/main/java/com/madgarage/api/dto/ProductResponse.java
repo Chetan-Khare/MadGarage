@@ -30,4 +30,5 @@ public class ProductResponse {
     private boolean isManualRating;
     private Double rating;
     private boolean wholesale;
+    private boolean active;
 }

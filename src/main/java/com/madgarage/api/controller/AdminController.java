@@ -21,7 +21,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/admin")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'WORKER')")
 public class AdminController {
 
     private final UserService userService;
@@ -42,8 +42,9 @@ public class AdminController {
     }
 
     @PostMapping("/users")
-    public ResponseEntity<?> createB2BUser(@Valid @RequestBody B2BUserRequest request) {
-        userService.createB2BUser(request);
+    public ResponseEntity<?> createB2BUser(java.security.Principal principal, @Valid @RequestBody B2BUserRequest request) {
+        com.madgarage.api.model.User adminOrWorker = userService.getCurrentUser(principal.getName());
+        userService.createB2BUser(request, adminOrWorker);
         return ResponseEntity.ok(request.getRole() + " Account created successfully!");
     }
 
@@ -54,8 +55,9 @@ public class AdminController {
     }
 
     @PutMapping("/users/{id}")
-    public ResponseEntity<?> updateUser(@PathVariable Long id, @Valid @RequestBody B2BUserRequest request) {
-        userService.updateUserByAdmin(id, request);
+    public ResponseEntity<?> updateUser(java.security.Principal principal, @PathVariable Long id, @Valid @RequestBody B2BUserRequest request) {
+        com.madgarage.api.model.User adminOrWorker = userService.getCurrentUser(principal.getName());
+        userService.updateUserByAdmin(id, request, adminOrWorker);
         return ResponseEntity.ok("User record updated successfully!");
     }
 
@@ -65,6 +67,7 @@ public class AdminController {
     }
 
     @DeleteMapping("/users/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deactivateUser(@PathVariable Long id) {
         userService.deleteUser(id);
         return ResponseEntity.ok("User successfully deactivated/banned.");
@@ -88,6 +91,7 @@ public class AdminController {
     }
 
     @DeleteMapping("/orders/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteOrder(@PathVariable Long id) {
         orderService.deleteOrder(id);
         return ResponseEntity.ok("Order successfully deleted.");
@@ -106,6 +110,7 @@ public class AdminController {
     }
 
     @DeleteMapping("/inventory/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);
         return ResponseEntity.ok("Product deleted successfully!");
@@ -124,6 +129,7 @@ public class AdminController {
     }
 
     @PutMapping("/settings")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateSetting(@RequestBody java.util.Map<String, String> body) {
         String key = body.get("key");
         String value = body.get("value");

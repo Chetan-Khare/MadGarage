@@ -6,10 +6,10 @@ import lombok.Data;
 
 @Data
 public class UserProfileUpdateRequest {
-    @Size(max = 10, message = "First name too long")
+    @Size(max = 50, message = "First name too long")
     private String firstName;
 
-    @Size(max = 10, message = "Last name too long")
+    @Size(max = 50, message = "Last name too long")
     private String lastName;
 
     @Email(message = "Invalid email format")

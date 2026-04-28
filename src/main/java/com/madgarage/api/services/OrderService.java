@@ -47,26 +47,28 @@ public class OrderService {
         // ARCH-03 FIX: Uses JOIN FETCH to load everything in one SQL query
         List<Order> rawOrders = orderRepository.findByUserWithItems(customer);
         return rawOrders.stream()
-                .filter(order -> order.getStatus() != OrderStatus.PENDING_PAYMENT)
+                .filter(order -> order.isActive() && order.getStatus() != OrderStatus.PENDING_PAYMENT)
                 .map(order -> orderMapper.mapToOrderResponse(order, customer))
                 .collect(Collectors.toList());
     }
 
     public List<OrderResponse> getSellerOrders(User seller) {
         return orderRepository.findAllBySeller(seller).stream()
+                .filter(Order::isActive)
                 .map(order -> orderMapper.mapToOrderResponse(order, seller))
                 .collect(Collectors.toList());
     }
 
     public List<OrderResponse> getAllOrdersAsDto() {
-        return orderRepository.findAll().stream()
-                .filter(order -> order.getStatus() != OrderStatus.PENDING_PAYMENT)
+        return orderRepository.findAllWithItems().stream()
+                .filter(order -> order.isActive() && order.getStatus() != OrderStatus.PENDING_PAYMENT)
                 .map(order -> orderMapper.mapToOrderResponse(order, null))
                 .collect(Collectors.toList());
     }
 
     public List<OrderResponse> getGarageFittings(User garage) {
         return orderRepository.findByFittingGarageIdWithItems(garage.getId()).stream()
+                .filter(Order::isActive)
                 .map(order -> orderMapper.mapToOrderResponse(order, garage))
                 .collect(Collectors.toList());
     }
@@ -115,7 +117,12 @@ public class OrderService {
         double taxAmount = 0.0; // Tax is already included in product price
         
         double currentShippingFee = systemSettingService.getSettingDouble("SHIPPING_FEE", 250.0);
+        double freeShippingThreshold = systemSettingService.getSettingDouble("FREE_SHIPPING_THRESHOLD", 400.0);
         double currentPlatformFee = systemSettingService.getSettingDouble("PLATFORM_FEE", 7.0);
+
+        if (subtotal >= freeShippingThreshold) {
+            currentShippingFee = 0.0;
+        }
 
         double grandTotal = subtotal + currentShippingFee + currentPlatformFee;
 
@@ -248,7 +255,7 @@ public class OrderService {
     }
 
     private boolean hasAuthorityForTransition(Role role, OrderStatus current, OrderStatus target) {
-        if (role == Role.ROLE_ADMIN) return true;
+        if (role == Role.ROLE_ADMIN || role == Role.ROLE_WORKER) return true;
 
         return switch (target) {
             case PAID -> false; // Only via system verifyPayment hook
@@ -277,7 +284,8 @@ public class OrderService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found."));
         
         restoreStock(order);
-        orderRepository.delete(order);
+        order.setActive(false);
+        orderRepository.save(order);
     }
 
     @Transactional

@@ -145,7 +145,7 @@ public class OrderController {
     }
 
     @PatchMapping("/{orderId:[0-9]+}/fitting-status")
-    @PreAuthorize("hasRole('GARAGE') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('GARAGE') or hasRole('ADMIN') or hasRole('WORKER')")
     public ResponseEntity<?> updateFittingStatus(Principal principal, @PathVariable Long orderId, @RequestParam String status) {
         User requester = userService.getCurrentUser(principal.getName());
         Order order = orderService.getOrderById(orderId);
@@ -161,7 +161,7 @@ public class OrderController {
     }
 
     @PutMapping("/{orderId:[0-9]+}/status")
-    @PreAuthorize("hasAnyRole('SELLER', 'ADMIN', 'GARAGE', 'CUSTOMER')")
+    @PreAuthorize("hasAnyRole('SELLER', 'ADMIN', 'WORKER', 'GARAGE', 'CUSTOMER')")
     public ResponseEntity<?> updateOrderStatus(Principal principal, @PathVariable Long orderId, @RequestParam String status) {
         User requester = userService.getCurrentUser(principal.getName());
         Order order = orderService.getOrderById(orderId);
@@ -177,7 +177,7 @@ public class OrderController {
     }
 
     private void assertOrderAccess(Order order, User currentUser) {
-        boolean isAdmin = currentUser.getRole() == com.madgarage.api.enums.Role.ROLE_ADMIN;
+        boolean isAdmin = currentUser.getRole() == com.madgarage.api.enums.Role.ROLE_ADMIN || currentUser.getRole() == com.madgarage.api.enums.Role.ROLE_WORKER;
         boolean isOwner = order.getUser() != null && order.getUser().getId().equals(currentUser.getId());
         boolean isSeller = currentUser.getRole() == com.madgarage.api.enums.Role.ROLE_SELLER;
         boolean ownsAnyItem = isSeller && order.getItems().stream()

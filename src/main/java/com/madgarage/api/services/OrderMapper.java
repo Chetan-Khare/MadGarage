@@ -80,6 +80,7 @@ public class OrderMapper {
                 .fittingGarageId(order.getFittingGarageId())
                 .fittingStatus(order.getFittingStatus())
                 .isOwner(requester != null && order.getUser() != null && order.getUser().getId().equals(requester.getId()))
+                .active(order.isActive())
                 .items(itemResponses);
 
         // Fetch garage details if it's a fitting order

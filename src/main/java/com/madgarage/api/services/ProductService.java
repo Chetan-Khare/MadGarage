@@ -55,9 +55,19 @@ public class ProductService {
     @Cacheable(value = "products", key = "{#category, #vehicleId}")
     public List<ProductResponse> getAllProducts(String category, Long vehicleId) {
         return fetchFilteredProducts(category, vehicleId).stream()
-                .filter(product -> !product.isFlagged())
+                .filter(product -> product.isActive() && !product.isFlagged())
                 .map(product -> mapToResponse(product))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Returns a single product by ID.
+     */
+    public ProductResponse getProductById(Long id) {
+        return productRepository.findById(id)
+                .map(this::mapToResponse)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Part not detected in our warehouse inventory"));
     }
 
     /**
@@ -67,7 +77,7 @@ public class ProductService {
     @Cacheable(value = "products_garage", key = "{#category, #vehicleId}")
     public List<GarageProductDTO> getGarageProducts(String category, Long vehicleId) {
         return fetchFilteredProducts(category, vehicleId).stream()
-                .filter(product -> !product.isFlagged())
+                .filter(product -> product.isActive() && !product.isFlagged())
                 .map(product -> {
             GarageProductDTO dto = new GarageProductDTO();
             dto.setId(product.getId());
@@ -170,11 +180,11 @@ public class ProductService {
      */
     @CacheEvict(value = {"products", "products_garage"}, allEntries = true)
     public void deleteProduct(Long id) {
-        if (!productRepository.existsById(id)) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.NOT_FOUND, "Product not found");
-        }
-        productRepository.deleteById(id);
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Product not found"));
+        product.setActive(false);
+        productRepository.save(product);
     }
 
     // -----------------------------------------------------------------------
@@ -209,6 +219,7 @@ public class ProductService {
                 .isManualRating(product.isManualRatingOverride())
                 .rating(product.isManualRatingOverride() ? product.getManualRating() : 4.8)
                 .wholesale(product.isWholesale())
+                .active(product.isActive())
                 .build();
     }
 }

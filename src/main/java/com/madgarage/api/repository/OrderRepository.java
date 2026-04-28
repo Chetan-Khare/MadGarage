@@ -20,9 +20,12 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query(value = "SELECT SUM(grand_total) FROM orders", nativeQuery = true)
     Double calculateTotalRevenue();
 
-    // SEC-06 FIX: JOIN FETCH ensures user is loaded in the same query,
-    // preventing LazyInitializationException that was causing the receipt 403.
-    @Query("SELECT o FROM Order o JOIN FETCH o.user WHERE o.id = :id")
+    @Query("SELECT o FROM Order o " +
+           "JOIN FETCH o.user " +
+           "LEFT JOIN FETCH o.items i " +
+           "LEFT JOIN FETCH i.product p " +
+           "LEFT JOIN FETCH p.seller " +
+           "WHERE o.id = :id")
     Optional<Order> findByIdWithUser(@Param("id") Long id);
 
     // ARCH-03 FIX: Single query loads orders + items + products for a user.
@@ -30,13 +33,23 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT DISTINCT o FROM Order o " +
            "JOIN FETCH o.user " +
            "JOIN FETCH o.items i " +
-           "JOIN FETCH i.product " +
+           "JOIN FETCH i.product p " +
+           "LEFT JOIN FETCH p.seller " +
            "WHERE o.user = :user " +
            "ORDER BY o.id DESC")
     List<Order> findByUserWithItems(@Param("user") User user);
 
-    @Query("SELECT o FROM Order o JOIN FETCH o.user LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product p WHERE o.fittingGarageId = :garageId AND o.status <> 'PENDING_PAYMENT' ORDER BY o.orderDate DESC")
+    @Query("SELECT o FROM Order o JOIN FETCH o.user LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product p LEFT JOIN FETCH p.seller WHERE o.fittingGarageId = :garageId AND o.status <> 'PENDING_PAYMENT' ORDER BY o.orderDate DESC")
     List<Order> findByFittingGarageIdWithItems(@Param("garageId") Long garageId);
+
+    @Query("SELECT DISTINCT o FROM Order o " +
+           "JOIN FETCH o.user " +
+           "LEFT JOIN FETCH o.items i " +
+           "LEFT JOIN FETCH i.product p " +
+           "LEFT JOIN FETCH p.seller " +
+           "WHERE o.status <> 'PENDING_PAYMENT' " +
+           "ORDER BY o.id DESC")
+    List<Order> findAllWithItems();
 
     @Query("SELECT SUM(oi.priceAtPurchase * oi.quantity) FROM OrderItem oi " +
            "WHERE oi.product.seller = :seller")
@@ -54,6 +67,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            "JOIN FETCH o.user " +
            "JOIN FETCH o.items i " +
            "JOIN FETCH i.product p " +
+           "LEFT JOIN FETCH p.seller " +
            "WHERE p.seller = :seller " +
            "AND o.status <> 'PENDING_PAYMENT' " +
            "ORDER BY o.id DESC")

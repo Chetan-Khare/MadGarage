@@ -61,6 +61,10 @@ public class Product {
     @Builder.Default
     private boolean flagged = false;
 
+    @Builder.Default
+    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private boolean isActive = true;
+
     @Column(length = 1000)
     private String flagReason;
 

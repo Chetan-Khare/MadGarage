@@ -3,8 +3,9 @@ package com.madgarage.api.services;
 import com.madgarage.api.dto.AiResponseDto;
 import com.madgarage.api.model.Product;
 import com.madgarage.api.repository.ProductRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
+
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeTypeUtils;
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Set;
 
 @Service
+@Slf4j
 public class GarageAssistantService {
 
     private final ChatClient chatClient;
@@ -27,13 +29,12 @@ public class GarageAssistantService {
         "help", "what can you do", "who are you"
     );
 
-    public GarageAssistantService(ChatClient.Builder chatClientBuilder, ProductRepository productRepository) {
-        this.chatClient = chatClientBuilder
-                .defaultOptions(GoogleGenAiChatOptions.builder()
-                        .model("gemma-4-26b")
-                        .build())
-                .build();
+    public GarageAssistantService(ChatClient.Builder chatClientBuilder, 
+                                  ProductRepository productRepository,
+                                  @org.springframework.beans.factory.annotation.Value("${spring.ai.google.genai.chat.options.model}") String modelName) {
+        this.chatClient = chatClientBuilder.build();
         this.productRepository = productRepository;
+        log.info("GarageAssistantService initialized with Gemini model: {}", modelName);
     }
 
     public AssistantResult analyzeCarAndFindParts(String userText, byte[] uploadedImage) {

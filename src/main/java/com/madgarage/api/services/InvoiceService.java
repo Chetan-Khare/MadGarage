@@ -140,13 +140,17 @@ public class InvoiceService {
         pSub.setAlignment(Element.ALIGN_RIGHT);
         summaryCell.addElement(pSub);
 
-        Paragraph pShip = new Paragraph("Shipping: INR " + String.format("%.2f", shipping), normalFont);
-        pShip.setAlignment(Element.ALIGN_RIGHT);
-        summaryCell.addElement(pShip);
+        if (shipping > 0) {
+            Paragraph pShip = new Paragraph("Shipping: INR " + String.format("%.2f", shipping), normalFont);
+            pShip.setAlignment(Element.ALIGN_RIGHT);
+            summaryCell.addElement(pShip);
+        }
 
-        Paragraph pPlat = new Paragraph("Platform Fee: INR " + String.format("%.2f", platform), normalFont);
-        pPlat.setAlignment(Element.ALIGN_RIGHT);
-        summaryCell.addElement(pPlat);
+        if (platform > 0) {
+            Paragraph pPlat = new Paragraph("Platform Fee: INR " + String.format("%.2f", platform), normalFont);
+            pPlat.setAlignment(Element.ALIGN_RIGHT);
+            summaryCell.addElement(pPlat);
+        }
         
         Paragraph pGrand = new Paragraph("Grand Total: INR " + String.format("%.2f", grandTotal), headerFont);
         pGrand.setAlignment(Element.ALIGN_RIGHT);

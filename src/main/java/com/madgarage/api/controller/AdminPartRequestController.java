@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin/requests")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'WORKER')")
 public class AdminPartRequestController {
 
     private final PartRequestRepository partRequestRepository;
@@ -28,6 +28,7 @@ public class AdminPartRequestController {
     }
 
     @GetMapping
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ResponseEntity<List<Map<String, Object>>> getAllRequests() {
         List<Map<String, Object>> requests = partRequestRepository.findAllByOrderByCreatedAtDesc()
                 .stream()

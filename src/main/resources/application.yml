@@ -30,10 +30,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: none
-    show-sql: true
+    show-sql: false
+    open-in-view: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.MySQLDialect
         jdbc:
           time_zone: UTC
 
@@ -42,15 +42,17 @@ spring:
     baseline-on-migrate: true
     baseline-version: 1
     validate-on-migrate: false # Prevent startup failure due to checksum mismatch on existing scripts.
+  thymeleaf:
+    check-template-location: false
 
-  # Spring AI Setup (Gemma 4 via Google AI Studio)
+  # Spring AI Setup (Google Gemini API)
   ai:
     google:
       genai:
-        api-key: ${GEMINI_API_KEY:DISABLED} # FALLBACK IF NO KEY IS PROVIDED
+        api-key: ${GEMINI_API_KEY}
         chat:
           options:
-            model: ${SPRING_AI_MODEL:gemma-4-26b}
+            model: gemini-2.0-flash
 
 # Tomcat connector config — remove default file-part count limit for multi-image uploads
 server:
