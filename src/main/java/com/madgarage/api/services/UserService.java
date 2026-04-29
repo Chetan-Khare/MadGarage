@@ -45,15 +45,20 @@ public class UserService {
      * Throws 401 if the user cannot be found (should never happen with a valid JWT).
      */
     public User getCurrentUser(String email) {
-        return userRepository.findByEmail(email)
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found."));
+        if (!user.isActive()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This account has been deactivated.");
+        }
+        return user;
     }
 
     /**
      * Retrieves all users in the system as Profile Response DTOs.
      */
-    public java.util.List<UserProfileResponse> getAllUsersProfileResponses() {
+    public java.util.List<UserProfileResponse> getAllUsersProfileResponses(User currentUser) {
         return userRepository.findAll().stream()
+                .filter(u -> currentUser.getRole() != Role.ROLE_WORKER || u.getRole() != Role.ROLE_ADMIN)
                 .map(this::toProfileResponse)
                 .collect(java.util.stream.Collectors.toList());
     }
@@ -74,6 +79,10 @@ public class UserService {
                 .active(user.isActive())
                 .city(user.getCity())
                 .address(user.getAddress())
+                .floor(user.getFloor())
+                .buildingName(user.getBuildingName())
+                .pincode(user.getPincode())
+                .state(user.getState())
                 .latitude(user.getLatitude())
                 .longitude(user.getLongitude())
                 .tieUp(user.getIsTieUp() != null ? user.getIsTieUp() : false)
@@ -123,6 +132,18 @@ public class UserService {
         }
         if (request.getCity() != null) {
             user.setCity(request.getCity());
+        }
+        if (request.getFloor() != null) {
+            user.setFloor(request.getFloor());
+        }
+        if (request.getBuildingName() != null) {
+            user.setBuildingName(request.getBuildingName());
+        }
+        if (request.getPincode() != null) {
+            user.setPincode(request.getPincode());
+        }
+        if (request.getState() != null) {
+            user.setState(request.getState());
         }
         if (request.getLatitude() != null) {
             user.setLatitude(request.getLatitude());
@@ -206,6 +227,7 @@ public class UserService {
     /**
      * Creates a new B2B user (SELLER or GARAGE role) for the admin dashboard.
      */
+    @Transactional
     public void createB2BUser(B2BUserRequest request, User currentUser) {
         if (request.getEmail() == null || request.getEmail().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is required for new accounts.");
@@ -242,6 +264,13 @@ public class UserService {
         }
         String rawPassword = request.getPassword();
 
+        if (Role.ROLE_GARAGE.equals(newRole) || Role.ROLE_SELLER.equals(newRole)) {
+            if (request.getAddress() == null || request.getCity() == null || request.getState() == null || request.getPincode() == null ||
+                request.getAddress().isBlank() || request.getCity().isBlank() || request.getState().isBlank() || request.getPincode().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, (Role.ROLE_GARAGE.equals(newRole) ? "Garage" : "Seller") + " profile must have complete address details (Street, City, State, Pincode).");
+            }
+        }
+
         User newUser = User.builder()
                 .firstName(request.getFirstName() != null ? request.getFirstName() : "Operator")
                 .lastName(request.getLastName() != null ? request.getLastName() : "User")
@@ -251,9 +280,13 @@ public class UserService {
                 .phone(request.getPhone())
                 .city(request.getCity())
                 .address(request.getAddress())
+                .floor(request.getFloor())
+                .buildingName(request.getBuildingName())
+                .pincode(request.getPincode())
+                .state(request.getState())
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
-                .isTieUp(request.getIsTieUp() != null ? request.getIsTieUp() : false)
+                .isTieUp(currentUser.getRole() == Role.ROLE_ADMIN ? (request.getIsTieUp() != null ? request.getIsTieUp() : false) : false)
                 .isActive(true)
                 .build();
 
@@ -270,6 +303,18 @@ public class UserService {
 
         if (currentUser.getRole() == Role.ROLE_WORKER && (user.getRole() == Role.ROLE_ADMIN || user.getRole() == Role.ROLE_WORKER)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Workers cannot modify Administrative or Worker accounts.");
+        }
+
+        if (request.getRole() != null && !request.getRole().equals(user.getRole().name())) {
+            if (currentUser.getRole() != Role.ROLE_ADMIN) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only Admins can change a user's role.");
+            }
+            try {
+                Role newRole = Role.valueOf(request.getRole());
+                user.setRole(newRole);
+            } catch (IllegalArgumentException e) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid role provided.");
+            }
         }
 
         // P1 REQ: Names and Password are now STATIC for Admins. Only Email and Phone can be edited.
@@ -291,11 +336,32 @@ public class UserService {
             user.setPhone(request.getPhone());
         }
 
+        if (user.getRole() == Role.ROLE_GARAGE || user.getRole() == Role.ROLE_SELLER) {
+            // If it's a garage or seller, ensure mandatory fields are not being cleared or were never set
+            String address = request.getAddress() != null ? request.getAddress() : user.getAddress();
+            String city = request.getCity() != null ? request.getCity() : user.getCity();
+            String state = request.getState() != null ? request.getState() : user.getState();
+            String pincode = request.getPincode() != null ? request.getPincode() : user.getPincode();
+
+            if (address == null || city == null || state == null || pincode == null || 
+                address.isBlank() || city.isBlank() || state.isBlank() || pincode.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Business profile revision rejected: Mandatory address details (Street, City, State, Pincode) cannot be empty.");
+            }
+        }
+
         if (request.getCity() != null) user.setCity(request.getCity());
         if (request.getAddress() != null) user.setAddress(request.getAddress());
+        if (request.getFloor() != null) user.setFloor(request.getFloor());
+        if (request.getBuildingName() != null) user.setBuildingName(request.getBuildingName());
+        if (request.getPincode() != null) user.setPincode(request.getPincode());
+        if (request.getState() != null) user.setState(request.getState());
         if (request.getLatitude() != null) user.setLatitude(request.getLatitude());
         if (request.getLongitude() != null) user.setLongitude(request.getLongitude());
-        if (request.getIsTieUp() != null) user.setIsTieUp(request.getIsTieUp());
+        
+        // P1 SEC: Only Admins can modify the official Tie-up status
+        if (request.getIsTieUp() != null && currentUser.getRole() == Role.ROLE_ADMIN) {
+            user.setIsTieUp(request.getIsTieUp());
+        }
 
         log.info("[Admin] Persisting identity revision for userId: {} by administrative action. New Email: {}", id, user.getEmail());
         userRepository.save(user);
@@ -330,9 +396,20 @@ public class UserService {
      * Bans (deactivates) a user from the platform.
      * Prevents data loss by disabling the account instead of physical deletion.
      */
-    public void deleteUser(Long id) {
+    public void deleteUser(Long id, User currentUser) {
+        if (currentUser.getId().equals(id)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot deactivate your own account.");
+        }
+        
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
+        
+        if (user.getRole() == Role.ROLE_ADMIN) {
+            long activeAdminCount = userRepository.countByRoleAndIsActiveTrue(Role.ROLE_ADMIN);
+            if (activeAdminCount <= 1) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot deactivate the last active Admin account.");
+            }
+        }
         
         long timestamp = System.currentTimeMillis();
         
@@ -352,6 +429,7 @@ public class UserService {
      * Restores a deactivated user record to active status.
      * Reverses the identifier scrambling and enables platform access.
      */
+    @Transactional
     public void restoreUser(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
@@ -403,5 +481,18 @@ public class UserService {
         return userRepository.findByRoleAndCityIgnoreCaseAndIsTieUpTrueAndIsActiveTrue(Role.ROLE_GARAGE, city.trim()).stream()
                 .map(this::toProfileResponse)
                 .collect(java.util.stream.Collectors.toList());
+    }
+
+    /**
+     * Aggregates platform-wide analytics for the Worker dashboard.
+     * Excludes financial revenue metrics to prevent data leakage.
+     */
+    public WorkerStatsResponse getWorkerStats() {
+        long totalUsers = userRepository.countByIsActiveTrue();
+        long totalSellers = userRepository.countByRoleAndIsActiveTrue(Role.ROLE_SELLER);
+        long totalProducts = productRepository.count();
+        long totalVehicles = vehicleRepository.count();
+
+        return new WorkerStatsResponse(totalUsers, totalSellers, totalProducts, totalVehicles);
     }
 }

@@ -47,14 +47,14 @@ public class OrderController {
     }
 
     @GetMapping("/seller-orders")
-    @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('SELLER', 'ADMIN', 'WORKER')")
     public ResponseEntity<?> getSellerOrders(Principal principal) {
         User seller = userService.getCurrentUser(principal.getName());
         return ResponseEntity.ok(orderService.getSellerOrders(seller));
     }
 
     @GetMapping("/garage-fittings")
-    @PreAuthorize("hasRole('GARAGE') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('GARAGE', 'ADMIN', 'WORKER')")
     public ResponseEntity<?> getGarageFittings(Principal principal) {
         User garage = userService.getCurrentUser(principal.getName());
         return ResponseEntity.ok(orderService.getGarageFittings(garage));
@@ -81,7 +81,7 @@ public class OrderController {
         }
         User customer = userService.getCurrentUser(principal.getName());
         Order order = orderService.getOrderById(orderId);
-        if (order == null || !order.getUser().getId().equals(customer.getId())) {
+        if (!order.getUser().getId().equals(customer.getId())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         orderService.setRazorpayOrderId(orderId, rzpOrderId);
@@ -92,8 +92,6 @@ public class OrderController {
     public ResponseEntity<?> verifyPayment(Principal principal, @PathVariable Long orderId, @RequestParam String paymentId, @RequestParam String signature) {
         User customer = userService.getCurrentUser(principal.getName());
         Order order = orderService.getOrderById(orderId);
-        
-        if (order == null) return ResponseEntity.notFound().build();
         assertOrderAccess(order, customer);
         
         OrderResponse response = orderService.verifyPayment(orderId, paymentId, signature);
@@ -104,10 +102,6 @@ public class OrderController {
     public ResponseEntity<byte[]> getInvoice(Principal principal, @PathVariable Long orderId) {
         User customer = userService.getCurrentUser(principal.getName());
         Order order = orderService.getOrderById(orderId);
-
-        if (order == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
 
         logger.info("Invoice Request - Order User ID: {}, Requesting Customer ID: {}",
                 order.getUser() != null ? order.getUser().getId() : "null",
@@ -126,10 +120,6 @@ public class OrderController {
     public ResponseEntity<?> getOrderDetails(Principal principal, @PathVariable Long orderId) {
         User customer = userService.getCurrentUser(principal.getName());
         Order order = orderService.getOrderById(orderId);
-
-        if (order == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
 
         assertOrderAccess(order, customer);
 
@@ -150,13 +140,9 @@ public class OrderController {
         User requester = userService.getCurrentUser(principal.getName());
         Order order = orderService.getOrderById(orderId);
 
-        if (order == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-
         assertOrderAccess(order, requester);
 
-        OrderResponse response = orderService.updateFittingStatus(orderId, status);
+        OrderResponse response = orderService.updateFittingStatus(orderId, status, requester);
         return ResponseEntity.ok(response);
     }
 
@@ -165,10 +151,6 @@ public class OrderController {
     public ResponseEntity<?> updateOrderStatus(Principal principal, @PathVariable Long orderId, @RequestParam String status) {
         User requester = userService.getCurrentUser(principal.getName());
         Order order = orderService.getOrderById(orderId);
-
-        if (order == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
 
         assertOrderAccess(order, requester);
 

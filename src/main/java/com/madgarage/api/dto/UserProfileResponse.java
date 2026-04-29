@@ -18,6 +18,10 @@ public class UserProfileResponse {
 
     private String city;
     private String address;
+    private String floor;
+    private String buildingName;
+    private String pincode;
+    private String state;
     private Double latitude;
     private Double longitude;
     private boolean tieUp;

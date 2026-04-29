@@ -176,9 +176,11 @@ public class OrderService {
         // Signature Verification
         String rzpOrderId = order.getRazorpayOrderId();
         
+        if (rzpOrderId == null || rzpOrderId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment cannot be verified: Razorpay order ID not set for this order.");
+        }
+        
         boolean isValid = razorpayService.verifySignature(rzpOrderId, paymentId, signature);
-        // Since we aren't storing RZP order ID yet, we might need a more robust check.
-        // However, for Test Mode, verifySignature(null, ...) with placeholders allows pass-through.
 
         if (!isValid) {
             throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Security Verification Failed: Tampered payment signature detected.");
@@ -193,18 +195,11 @@ public class OrderService {
         return orderMapper.mapToOrderResponse(order, order.getUser());
     }
 
-    private String calculateMockSignature(Long orderId, String paymentId) {
-        // Reduced complexity for the security demonstration: Base64(orderId|paymentId)
-        // In a production environment, this MUST be a server-side HMAC-SHA256 using 
-        // the payment provider's secret key.
-        String data = orderId + "|" + paymentId;
-        return java.util.Base64.getEncoder().encodeToString(data.getBytes());
-    }
-
     // SEC-06 FIX: Uses JOIN FETCH so order.getUser() is never null/lazy-proxy
     // This was the root cause of the receipt 403 Forbidden error.
     public Order getOrderById(Long id) {
-        return orderRepository.findByIdWithUser(id).orElse(null);
+        return orderRepository.findByIdWithUser(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found."));
     }
 
     @Transactional
@@ -312,7 +307,7 @@ public class OrderService {
     }
 
     @Transactional
-    public OrderResponse updateFittingStatus(Long orderId, String newFittingStatus) {
+    public OrderResponse updateFittingStatus(Long orderId, String newFittingStatus, User requester) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found."));
 
@@ -320,10 +315,10 @@ public class OrderService {
         
         // If the garage marks it as arrived, we update the main status too
         if ("ARRIVED_AT_GARAGE".equals(canonical)) {
-            order.setStatus(OrderStatus.ARRIVED_AT_GARAGE);
+            updateOrderStatus(orderId, "ARRIVED_AT_GARAGE", requester);
             order.setFittingStatus("PENDING_INSPECTION");
         } else if ("COMPLETED".equals(canonical)) {
-            order.setStatus(OrderStatus.DELIVERED);
+            updateOrderStatus(orderId, "DELIVERED", requester);
             order.setFittingStatus("COMPLETED");
         } else {
             order.setFittingStatus(canonical);

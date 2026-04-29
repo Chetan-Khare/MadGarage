@@ -28,9 +28,9 @@ public class AuthController {
     }
 
     private String getClientIp(jakarta.servlet.http.HttpServletRequest request) {
-        String xfHeader = request.getHeader("X-Forwarded-For");
-        if (xfHeader == null) return request.getRemoteAddr();
-        return xfHeader.split(",")[0].trim();
+        // L-2 FIX: Rely on Spring Boot's built-in proxy header resolution (requires application.yml config)
+        // instead of manually parsing X-Forwarded-For which can be spoofed.
+        return request.getRemoteAddr();
     }
 
     @PostMapping("/verify-otp")
@@ -75,8 +75,8 @@ public class AuthController {
         jakarta.servlet.http.Cookie cookie = new jakarta.servlet.http.Cookie("mg_auth", token);
         cookie.setPath("/");
         cookie.setHttpOnly(true);
-        cookie.setSecure(false); // SET TO TRUE IN PRODUCTION (Requires HTTPS)
-        cookie.setAttribute("SameSite", "Lax");
+        cookie.setSecure(true); // C-3 FIX: Requires HTTPS for all requests
+        cookie.setAttribute("SameSite", "None"); // SameSite None requires Secure=true
         cookie.setMaxAge(7 * 24 * 60 * 60); // 7 Days
         response.addCookie(cookie);
     }

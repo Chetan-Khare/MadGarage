@@ -37,8 +37,14 @@ public class AdminController {
     }
 
     @GetMapping("/analytics")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<AdminAnalyticsResponse> getAnalytics() {
         return ResponseEntity.ok(userService.getAdminAnalytics());
+    }
+
+    @GetMapping("/worker-stats")
+    public ResponseEntity<com.madgarage.api.dto.WorkerStatsResponse> getWorkerStats() {
+        return ResponseEntity.ok(userService.getWorkerStats());
     }
 
     @PostMapping("/users")
@@ -49,6 +55,7 @@ public class AdminController {
     }
 
     @PostMapping("/users/{id}/restore")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> restoreUser(@PathVariable Long id) {
         userService.restoreUser(id);
         return ResponseEntity.ok("Account successfully restored to active status.");
@@ -62,14 +69,16 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    public ResponseEntity<List<UserProfileResponse>> getAllUsers() {
-        return ResponseEntity.ok(userService.getAllUsersProfileResponses());
+    public ResponseEntity<List<UserProfileResponse>> getAllUsers(java.security.Principal principal) {
+        com.madgarage.api.model.User currentUser = userService.getCurrentUser(principal.getName());
+        return ResponseEntity.ok(userService.getAllUsersProfileResponses(currentUser));
     }
 
     @DeleteMapping("/users/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> deactivateUser(@PathVariable Long id) {
-        userService.deleteUser(id);
+    public ResponseEntity<?> deactivateUser(@PathVariable Long id, java.security.Principal principal) {
+        com.madgarage.api.model.User currentUser = userService.getCurrentUser(principal.getName());
+        userService.deleteUser(id, currentUser);
         return ResponseEntity.ok("User successfully deactivated/banned.");
     }
 

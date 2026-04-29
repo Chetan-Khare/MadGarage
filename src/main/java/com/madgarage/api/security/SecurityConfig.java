@@ -87,7 +87,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/config/**").permitAll()
                         .requestMatchers("/api/health/**").permitAll()
-                        .requestMatchers("/api/payments/**").permitAll()
                         .requestMatchers("/api/assistant/**").authenticated()
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/api/vehicles/**").permitAll()
@@ -95,8 +94,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/users/**").hasAnyRole("ADMIN", "WORKER")
                         .requestMatchers("/api/admin/orders/**").hasAnyRole("ADMIN", "WORKER")
                         .requestMatchers("/api/admin/inventory/**").hasAnyRole("ADMIN", "WORKER")
-                        .requestMatchers("/api/admin/analytics").hasAnyRole("ADMIN", "WORKER")
+                        .requestMatchers("/api/admin/analytics").hasRole("ADMIN")
                         .requestMatchers("/api/admin/requests/**").hasAnyRole("ADMIN", "WORKER")
+                        .requestMatchers("/api/admin/worker-stats").hasAnyRole("ADMIN", "WORKER")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/seller/**").hasAnyRole("SELLER", "ADMIN", "WORKER")
                         .requestMatchers("/api/products/garage").hasAnyRole("GARAGE", "ADMIN", "WORKER")
@@ -117,12 +117,10 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOriginPatterns(List.of(
                 "http://localhost:8081",
-                "http://192.168.[0-9]{1,3}.[0-9]{1,3}:8081",
-                "http://localhost:3000",
-                "http://localhost:8080"));
+                "http://localhost:3000"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
-        config.setExposedHeaders(List.of("*"));
+        config.setExposedHeaders(List.of("Authorization", "Content-Disposition"));
         config.setAllowCredentials(true);
         source.registerCorsConfiguration("/**", config);
         return source;

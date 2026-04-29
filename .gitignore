@@ -35,3 +35,4 @@ build/
 # Security
 .env
 *.env
+application-local.yml

@@ -108,6 +108,7 @@ public class AuthService {
      * Completes registration for a verified phone number.
      * Validates account details and creates the final user record.
      */
+    @org.springframework.transaction.annotation.Transactional
     public AuthResponse completeRegistration(CompleteRegistrationRequest request) {
         String phone;
         try {
@@ -149,16 +150,28 @@ public class AuthService {
      * Registers a new CUSTOMER account and returns a JWT so the user
      * is logged-in immediately after sign-up.
      */
+    @org.springframework.transaction.annotation.Transactional
     public AuthResponse register(RegisterRequest request) {
         String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
         if (userRepository.findByEmail(email).isPresent()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is already registered!");
         }
 
+        // H-7 FIX: Ensure phone is handled (even if null for email-only registration).
+        // If the client starts sending phone in RegisterRequest, validate it here.
+        // For now, allow email-only registration but prevent duplicate null phones if DB constraint exists.
+        String phone = request.getPhone(); // Requires adding phone to RegisterRequest
+        if (phone != null && !phone.isBlank()) {
+            if (userRepository.findByPhone(phone).isPresent()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Phone number is already registered!");
+            }
+        }
+
         User newUser = User.builder()
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .email(email)
+                .phone(phone)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(Role.ROLE_CUSTOMER)
                 .isActive(true)

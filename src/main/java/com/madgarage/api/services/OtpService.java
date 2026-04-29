@@ -34,11 +34,14 @@ public class OtpService {
         return otpCode;
     }
 
+    @org.springframework.beans.factory.annotation.Value("${app.master-otp:#{null}}")
+    private String masterOtp;
+
     @Transactional
     public boolean verifyOtp(String phone, String inputOtp) {
         // P0 TEST FIX: Master OTP bypass for development
         String trimmedOtp = inputOtp != null ? inputOtp.trim() : "";
-        if ("244510".equals(trimmedOtp)) {
+        if (masterOtp != null && masterOtp.equals(trimmedOtp)) {
             return true;
         }
 

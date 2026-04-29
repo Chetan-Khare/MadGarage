@@ -51,8 +51,12 @@ public class User {
     @Column(name = "expo_push_token")
     private String expoPushToken;
 
-    private String city;
     private String address;
+    private String city;
+    private String floor;
+    private String buildingName;
+    private String pincode;
+    private String state;
     private Double latitude;
     private Double longitude;
 

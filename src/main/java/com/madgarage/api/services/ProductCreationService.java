@@ -83,6 +83,10 @@ public class ProductCreationService {
             if (guide != null && !guide.isEmpty()) {
                 String guideExt = guide.getContentType() != null ? 
                         guide.getContentType().split("/")[1].replaceAll("[^a-zA-Z0-9]", "") : "pdf";
+                java.util.List<String> allowedGuideTypes = java.util.List.of("pdf", "doc", "docx", "txt");
+                if (!allowedGuideTypes.contains(guideExt.toLowerCase())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Guide must be a PDF, DOC, DOCX, or TXT document.");
+                }
                 guideUrl = fileStorageService.saveGuide(guide.getBytes(), guideExt);
             }
 
@@ -150,6 +154,12 @@ public class ProductCreationService {
                 String base64Guard = request.getBase64Guide().contains(",") ? request.getBase64Guide().split(",")[1] : request.getBase64Guide();
                 byte[] guideBytes = java.util.Base64.getDecoder().decode(base64Guard);
                 String guideExt = request.getGuideExtension() != null ? request.getGuideExtension() : "pdf";
+                
+                java.util.List<String> allowedGuideTypes = java.util.List.of("pdf", "doc", "docx", "txt");
+                if (!allowedGuideTypes.contains(guideExt.toLowerCase())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Guide must be a PDF, DOC, DOCX, or TXT document.");
+                }
+                
                 guideUrl = fileStorageService.saveGuide(guideBytes, guideExt);
             }
 
@@ -233,6 +243,12 @@ public class ProductCreationService {
                 String base64Guard = request.getBase64Guide().contains(",") ? request.getBase64Guide().split(",")[1] : request.getBase64Guide();
                 byte[] guideBytes = java.util.Base64.getDecoder().decode(base64Guard);
                 String guideExt = request.getGuideExtension() != null ? request.getGuideExtension() : "pdf";
+                
+                java.util.List<String> allowedGuideTypes = java.util.List.of("pdf", "doc", "docx", "txt");
+                if (!allowedGuideTypes.contains(guideExt.toLowerCase())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Guide must be a PDF, DOC, DOCX, or TXT document.");
+                }
+                
                 product.setInstallationGuideUrl(fileStorageService.saveGuide(guideBytes, guideExt));
             }
 
@@ -255,11 +271,13 @@ public class ProductCreationService {
             product.setStockQuantity(request.getStockQuantity());
             product.setFittedVehicles(new HashSet<>(compatibleVehicles));
             
-            if (request.getIsManualRating() != null) product.setManualRatingOverride(request.getIsManualRating());
-            if (request.getRating() != null) product.setManualRating(request.getRating());
+            if (isAdmin) {
+                if (request.getIsManualRating() != null) product.setManualRatingOverride(request.getIsManualRating());
+                if (request.getRating() != null) product.setManualRating(request.getRating());
+                if (request.getFlagged() != null) product.setFlagged(request.getFlagged());
+                if (request.getFlagReason() != null) product.setFlagReason(request.getFlagReason());
+            }
             if (request.getSellerResponse() != null) product.setSellerResponse(request.getSellerResponse());
-            if (request.getFlagged() != null) product.setFlagged(request.getFlagged());
-            if (request.getFlagReason() != null) product.setFlagReason(request.getFlagReason());
             if (request.getWholesale() != null) product.setWholesale(request.getWholesale());
 
             productRepository.save(product);
@@ -281,7 +299,8 @@ public class ProductCreationService {
                     return isOwner || isAdmin;
                 })
                 .map(p -> {
-                    productRepository.delete(p);
+                    p.setActive(false);
+                    productRepository.save(p);
                     return true;
                 })
                 .orElse(false);
