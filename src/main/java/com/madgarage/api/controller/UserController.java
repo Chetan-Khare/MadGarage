@@ -57,6 +57,12 @@ public class UserController {
         return ResponseEntity.ok(fileUrl);
     }
 
+    @DeleteMapping("/profile-image")
+    public ResponseEntity<?> deleteProfileImage(Principal principal) {
+        userService.deleteProfileImage(principal.getName());
+        return ResponseEntity.ok("Profile image removed.");
+    }
+
     @PutMapping("/push-token")
     public ResponseEntity<?> savePushToken(
             Principal principal,

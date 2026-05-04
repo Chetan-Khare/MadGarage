@@ -225,6 +225,19 @@ public class UserService {
     }
 
     /**
+     * Clears the profile image URL for a user and deletes the physical file.
+     */
+    @Transactional
+    public void deleteProfileImage(String email) {
+        User user = getCurrentUser(email);
+        if (user.getProfileImageUrl() != null) {
+            fileStorageService.deleteFile(user.getProfileImageUrl());
+            user.setProfileImageUrl(null);
+            userRepository.save(user);
+        }
+    }
+
+    /**
      * Creates a new B2B user (SELLER or GARAGE role) for the admin dashboard.
      */
     @Transactional

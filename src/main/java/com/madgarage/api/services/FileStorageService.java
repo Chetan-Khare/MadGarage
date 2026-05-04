@@ -39,4 +39,31 @@ public class FileStorageService {
         Files.write(target, bytes);
         return urlPrefix + fileName;
     }
+
+    public void deleteFile(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) return;
+
+        String relPath;
+        if (fileUrl.startsWith("/uploads/")) {
+            relPath = UPLOAD_REL;
+        } else if (fileUrl.startsWith("/guides/")) {
+            relPath = GUIDES_REL;
+        } else {
+            return; // Not a managed file path
+        }
+
+        try {
+            String fileName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+            Path base = Paths.get(System.getProperty("user.dir"), relPath).toAbsolutePath().normalize();
+            Path target = base.resolve(fileName).normalize();
+
+            // Safety check: Ensure target is within base directory
+            if (target.startsWith(base) && Files.exists(target)) {
+                Files.delete(target);
+            }
+        } catch (Exception e) {
+            // Log error but don't fail the request (the DB record update is more important)
+            System.err.println("Failed to delete physical file: " + fileUrl);
+        }
+    }
 }

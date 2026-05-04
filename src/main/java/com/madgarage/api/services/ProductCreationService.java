@@ -209,9 +209,9 @@ public class ProductCreationService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found."));
 
         boolean isOwner = product.getSeller() != null && product.getSeller().getId().equals(seller.getId());
-        boolean isAdmin = seller.getRole() == Role.ROLE_ADMIN;
+        boolean isStaff = seller.getRole() == Role.ROLE_ADMIN || seller.getRole() == Role.ROLE_WORKER;
 
-        if (!isOwner && !isAdmin) {
+        if (!isOwner && !isStaff) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Unauthorized: You are not allowed to edit this product.");
         }
 
@@ -271,7 +271,7 @@ public class ProductCreationService {
             product.setStockQuantity(request.getStockQuantity());
             product.setFittedVehicles(new HashSet<>(compatibleVehicles));
             
-            if (isAdmin) {
+            if (isStaff) {
                 if (request.getIsManualRating() != null) product.setManualRatingOverride(request.getIsManualRating());
                 if (request.getRating() != null) product.setManualRating(request.getRating());
                 if (request.getFlagged() != null) product.setFlagged(request.getFlagged());
@@ -295,8 +295,8 @@ public class ProductCreationService {
         return productRepository.findById(productId)
                 .filter(p -> {
                     boolean isOwner = p.getSeller() != null && p.getSeller().getId().equals(seller.getId());
-                    boolean isAdmin = seller.getRole() == Role.ROLE_ADMIN;
-                    return isOwner || isAdmin;
+                    boolean isStaff = seller.getRole() == Role.ROLE_ADMIN || seller.getRole() == Role.ROLE_WORKER;
+                    return isOwner || isStaff;
                 })
                 .map(p -> {
                     p.setActive(false);
@@ -313,9 +313,9 @@ public class ProductCreationService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found."));
 
         boolean isOwner = product.getSeller() != null && product.getSeller().getId().equals(seller.getId());
-        boolean isAdmin = seller.getRole() == Role.ROLE_ADMIN;
+        boolean isStaff = seller.getRole() == Role.ROLE_ADMIN || seller.getRole() == Role.ROLE_WORKER;
 
-        if (!isOwner && !isAdmin) {
+        if (!isOwner && !isStaff) {
             return false;
         }
 

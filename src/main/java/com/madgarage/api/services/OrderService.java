@@ -217,8 +217,9 @@ public class OrderService {
 
         if (currentStatus == targetStatus) return orderMapper.mapToOrderResponse(order, order.getUser());
 
-        // 1. Verify the transition is mathematically valid
-        if (!isValidTransition(currentStatus, targetStatus)) {
+        // 1. Verify the transition is valid (Staff can override anything)
+        boolean isStaff = requester.getRole() == Role.ROLE_ADMIN || requester.getRole() == Role.ROLE_WORKER;
+        if (!isStaff && !isValidTransition(currentStatus, targetStatus)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Invalid state transition from " + currentStatus + " to " + targetStatus);
         }
 
@@ -250,6 +251,7 @@ public class OrderService {
     }
 
     private boolean hasAuthorityForTransition(Role role, OrderStatus current, OrderStatus target) {
+        // Staff (Admin/Worker) have full authority over status transitions
         if (role == Role.ROLE_ADMIN || role == Role.ROLE_WORKER) return true;
 
         return switch (target) {
