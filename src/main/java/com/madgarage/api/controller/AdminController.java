@@ -129,7 +129,7 @@ public class AdminController {
     public ResponseEntity<?> toggleProductFlag(@PathVariable Long id, @RequestBody(required = false) java.util.Map<String, String> body) {
         String reason = (body != null) ? body.get("reason") : null;
         boolean newState = productService.toggleProductFlag(id, reason);
-        return ResponseEntity.ok("Product " + (newState ? "flagged" : "unflagged") + " successfully!");
+        return ResponseEntity.ok("Product " + (newState ? "flagged" : "un-flagged") + " successfully!");
     }
 
     @GetMapping("/settings")

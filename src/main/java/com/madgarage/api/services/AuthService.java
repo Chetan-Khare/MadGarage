@@ -85,7 +85,7 @@ public class AuthService {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This account has been deactivated. Access denied.");
             }
             String token = jwtService.generateToken(user);
-            log.info("[Auth] Existing user found. Returning token for userId: {}", user.getId());
+
             return AuthResponse.builder()
                     .token(token)
                     .message("OTP Login Successful!")
@@ -95,7 +95,7 @@ public class AuthService {
         } else {
             // First time login: require registration details (email/password)
             String regToken = jwtService.generateRegistrationToken(request.getPhone());
-            log.info("[Auth] New user detected. Returning registrationToken.");
+
             return AuthResponse.builder()
                     .message("Verification successful! Please complete your profile.")
                     .requiresRegistration(true)
@@ -193,7 +193,6 @@ public class AuthService {
      */
     public AuthResponse login(LoginRequest request) {
         String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
-        log.info("[Auth] Login attempt initiated for canonicalized email: [{}]", email);
         
         io.github.bucket4j.EstimationProbe probe = rateLimitingService.probeAuthAttempt(email);
         if (!probe.canBeConsumed()) {

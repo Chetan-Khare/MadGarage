@@ -32,8 +32,8 @@ public class VehicleService {
     }
 
     @Cacheable("vehicle_makes")
-    public List<String> getMakes() {
-        return vehicleRepository.findDistinctMakes();
+    public List<Make> getMakes() {
+        return makeRepository.findAllByOrderByNameAsc();
     }
 
     @Cacheable(value = "vehicle_models", key = "#make")

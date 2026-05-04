@@ -3,6 +3,7 @@ package com.madgarage.api.services;
 import com.madgarage.api.model.Otp;
 import com.madgarage.api.repository.OtpRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +17,7 @@ public class OtpService {
 
     private static final int OTP_EXPIRY_MINUTES = 5;
     private final OtpRepository otpRepository;
+    private final PasswordEncoder passwordEncoder;
     private final Random random = new SecureRandom();
 
     @Transactional
@@ -26,7 +28,7 @@ public class OtpService {
         String otpCode = String.format("%06d", random.nextInt(1000000));
         Otp otp = Otp.builder()
                 .phone(phone)
-                .otpCode(otpCode)
+                .otpCode(passwordEncoder.encode(otpCode)) // Secure Hashing
                 .expiryTime(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES))
                 .build();
 
@@ -52,7 +54,7 @@ public class OtpService {
                         return false;
                     }
 
-                    if (data.getOtpCode().equals(inputOtp)) {
+                    if (passwordEncoder.matches(inputOtp, data.getOtpCode())) {
                         otpRepository.deleteByPhone(phone); // Burn after use
                         return true;
                     } else {

@@ -1,5 +1,6 @@
 package com.madgarage.api.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -23,9 +24,13 @@ public class Make {
     @Column(nullable = false, unique = true)
     private String name;
 
+    @Column(name = "logo_url")
+    private String logoUrl;
+
     // One Brand makes many different Models
     @OneToMany(mappedBy = "make", cascade = CascadeType.ALL)
     @Builder.Default
     @ToString.Exclude
+    @JsonIgnore
     private List<CarModel> models = new ArrayList<>();
 }

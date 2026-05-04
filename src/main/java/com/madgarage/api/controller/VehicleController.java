@@ -28,7 +28,7 @@ public class VehicleController {
     }
 
     @GetMapping("/makes")
-    public List<String> getMakes() {
+    public List<com.madgarage.api.model.Make> getMakes() {
         return vehicleService.getMakes();
     }
 

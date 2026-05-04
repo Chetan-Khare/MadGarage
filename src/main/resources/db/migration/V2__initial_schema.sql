@@ -1,4 +1,3 @@
-/*
 -- V2: Initial Schema for Core Tables (Users, Products, Orders, OrderItems)
 -- This file restores the baseline schema that was previously managed by Hibernate ddl-auto.
 
@@ -64,11 +63,8 @@ CREATE TABLE IF NOT EXISTS product_fitment (
     PRIMARY KEY (product_id, vehicle_id),
     CONSTRAINT fk_pf_product FOREIGN KEY (product_id) REFERENCES products(id)
 );
-*/
 
--- Seed data (Commented out as per user request for clean migrations)
-/*
+-- Seed data 
 INSERT INTO users (first_name, last_name, email, password, role, is_active, created_at, updated_at) VALUES 
 ('Admin', 'User', 'admin@madgarage.com', '$2a$10$8.UnVuG9HHgffUDAlk8qfOuVGkqRzgVymGe07xd00DMxs.TVuHOnC', 'ROLE_ADMIN', true, NOW(), NOW()),
 ('Premium', 'Seller', 'seller@madgarage.com', '$2a$10$8.UnVuG9HHgffUDAlk8qfOuVGkqRzgVymGe07xd00DMxs.TVuHOnC', 'ROLE_SELLER', true, NOW(), NOW());
-*/

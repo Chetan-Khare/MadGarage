@@ -39,7 +39,6 @@ public class ExpoNotificationService {
      */
     public void sendStatusUpdateNotification(String expoPushToken, String partName, String newStatus) {
         if (expoPushToken == null || expoPushToken.isBlank()) {
-            log.info("[Expo Push] No push token for user. Skipping notification.");
             return;
         }
 

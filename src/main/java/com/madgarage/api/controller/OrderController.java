@@ -103,10 +103,6 @@ public class OrderController {
         User customer = userService.getCurrentUser(principal.getName());
         Order order = orderService.getOrderById(orderId);
 
-        logger.info("Invoice Request - Order User ID: {}, Requesting Customer ID: {}",
-                order.getUser() != null ? order.getUser().getId() : "null",
-                customer.getId());
-
         assertOrderAccess(order, customer);
 
         byte[] pdf = invoiceService.generateInvoicePdf(order);
