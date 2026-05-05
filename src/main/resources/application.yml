@@ -26,6 +26,10 @@ spring:
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      max-lifetime: 580000 # Retire connections before MySQL (600s) kills them
+      idle-timeout: 300000 # 5 minutes
+      connection-timeout: 20000 # 20 seconds
 
   # Spring Boot 3 SQL Initialization
   sql:

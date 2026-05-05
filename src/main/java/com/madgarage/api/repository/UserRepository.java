@@ -18,6 +18,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     long countByRole(Role role);
     long countByIsActiveTrue();
     long countByRoleAndIsActiveTrue(Role role);
+    long countByIsTieUpTrueAndIsActiveTrue();
 
     java.util.List<User> findByRoleAndCityIgnoreCaseAndIsTieUpTrueAndIsActiveTrue(Role role, String city);
 }
