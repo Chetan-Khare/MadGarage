@@ -13,13 +13,25 @@ public class WebConfig implements WebMvcConfigurer {
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         // Use classpath-based resource locations for better portability across dev/prod environments
         
-        // Expose the "uploads" folder (Assuming this might be external in production, but keeping classpath for now)
+        // Calculate physical paths to serve dynamic runtime uploads safely on all OS (especially Windows)
+        String userDir = System.getProperty("user.dir");
+        
+        String uploadPath = System.getenv("UPLOAD_DIR") != null 
+            ? Paths.get(System.getenv("UPLOAD_DIR"), "uploads").toUri().toString()
+            : Paths.get(userDir, "src/main/resources/static/uploads").toUri().toString();
+            
+        String guidesPath = System.getenv("UPLOAD_DIR") != null 
+            ? Paths.get(System.getenv("UPLOAD_DIR"), "guides").toUri().toString()
+            : Paths.get(userDir, "src/main/resources/static/guides").toUri().toString();
+
+        // Expose the "uploads" folder using physical file system URI (allows runtime uploads to be served)
+        // Ensure trailing slash is present for Spring resource locations
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("classpath:/static/uploads/");
+                .addResourceLocations(uploadPath.endsWith("/") ? uploadPath : uploadPath + "/");
 
         // Expose the "guides" folder
         registry.addResourceHandler("/guides/**")
-                .addResourceLocations("classpath:/static/guides/");
+                .addResourceLocations(guidesPath.endsWith("/") ? guidesPath : guidesPath + "/");
 
         // Expose the "images" folder (for brand logos)
         // This maps /images/logos/tata.png to src/main/resources/static/images/logos/tata.png

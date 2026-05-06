@@ -12,6 +12,10 @@ import org.springframework.util.MimeTypeUtils;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Set;
+import com.madgarage.api.model.ChatMessage;
+import com.madgarage.api.repository.ChatMessageRepository;
+import com.madgarage.api.repository.UserRepository;
+import com.madgarage.api.model.User;
 
 @Service
 @Slf4j
@@ -19,6 +23,8 @@ public class GarageAssistantService {
 
     private final ChatClient chatClient;
     private final ProductRepository productRepository;
+    private final ChatMessageRepository chatMessageRepository;
+    private final UserRepository userRepository;
 
     public record AssistantResult(String message, List<Product> products, boolean needsMoreInfo, boolean showRequestButton) {}
 
@@ -30,27 +36,37 @@ public class GarageAssistantService {
     );
 
     public GarageAssistantService(ChatClient.Builder chatClientBuilder, 
-                                  ProductRepository productRepository) {
+                                  ProductRepository productRepository,
+                                  ChatMessageRepository chatMessageRepository,
+                                  UserRepository userRepository) {
         this.chatClient = chatClientBuilder.build();
         this.productRepository = productRepository;
+        this.chatMessageRepository = chatMessageRepository;
+        this.userRepository = userRepository;
     }
 
-    public AssistantResult analyzeCarAndFindParts(String userText, byte[] uploadedImage) {
+    public AssistantResult analyzeCarAndFindParts(Long userId, String userText, List<byte[]> uploadedImages, String imageUrl) {
+        // Save user message
+        saveMessage(userId, userText, ChatMessage.SenderType.USER, imageUrl);
 
         // ── Guard: treat null/empty message as a greeting ──────────────────────
         String text = (userText == null || userText.isBlank()) ? "hi" : userText.trim();
 
         // ── Fast-path: conversational greetings → no AI/DB call needed ─────────
         if (isGreeting(text)) {
-            return new AssistantResult(
-                    """
+            String greetingReply = """
                             Hey there! 👋 I'm your Virtual Mechanic at Mad Garage!
 
                             I can help you find the right parts for your vehicle. Just tell me:
                             • Your vehicle's **Year, Make & Model** (e.g. "2019 Hyundai i10")
                             • What part you're looking for (e.g. brake pads, air filter)
 
-                            Or upload a photo of the part or damage and I'll take a look! 🔧""",
+                            Or upload a photo of the part or damage and I'll take a look! 🔧""";
+            
+            saveMessage(userId, greetingReply, ChatMessage.SenderType.AI, null);
+            
+            return new AssistantResult(
+                    greetingReply,
                 new ArrayList<>(),
                 false,
                 false
@@ -89,9 +105,12 @@ public class GarageAssistantService {
                     .user(u -> {
                         // Wrapping user input in delimiters to separate it from instructions
                         u.text("USER INPUT TO ANALYZE: \n###\n" + text + "\n###");
-                        if (uploadedImage != null && uploadedImage.length > 0) {
-                            u.media(MimeTypeUtils.IMAGE_JPEG,
-                                    new ByteArrayResource(uploadedImage));
+                        if (uploadedImages != null && !uploadedImages.isEmpty()) {
+                            for (byte[] img : uploadedImages) {
+                                if (img != null && img.length > 0) {
+                                    u.media(MimeTypeUtils.IMAGE_JPEG, new ByteArrayResource(img));
+                                }
+                            }
                         }
                     });
 
@@ -99,8 +118,10 @@ public class GarageAssistantService {
 
             // ── If AI still needs more info (no vehicle/trim), return its question ──
             if (aiData == null) {
+                String errorReply = "Hey! 👋 I'm your Virtual Mechanic. Tell me your vehicle's Year, Make & Model and I'll find the right parts!";
+                saveMessage(userId, errorReply, ChatMessage.SenderType.AI, null);
                 return new AssistantResult(
-                    "Hey! 👋 I'm your Virtual Mechanic. Tell me your vehicle's Year, Make & Model and I'll find the right parts!",
+                    errorReply,
                     new ArrayList<>(), true, false
                 );
             }
@@ -109,6 +130,8 @@ public class GarageAssistantService {
                 String reply = (aiData.message() != null && !aiData.message().isBlank())
                     ? aiData.message()
                     : "Could you share a bit more about your vehicle? I'll need the Year, Make, Model, and trim to find the perfect parts for you! 🔧";
+                
+                saveMessage(userId, reply, ChatMessage.SenderType.AI, null);
                 return new AssistantResult(reply, new ArrayList<>(), true, false);
             }
 
@@ -130,13 +153,17 @@ public class GarageAssistantService {
                   + aiData.year() + " " + aiData.make() + " " + aiData.model()
                   + " (" + aiData.fuel() + ", " + aiData.trim() + ", " + aiData.engine() + "):";
 
+            saveMessage(userId, successMsg, ChatMessage.SenderType.AI, null);
             return new AssistantResult(successMsg, products, false, products.isEmpty());
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Neural diagnostic failure for userId={}: {}", userId, e.getMessage(), e);
+            String errorReply = "Hey! 👋 I'm your Virtual Mechanic at Mad Garage. " +
+                                "It looks like I had a small hiccup. Could you tell me your vehicle's " +
+                                "Year, Make & Model so I can find the right parts for you?";
+            saveMessage(userId, errorReply, ChatMessage.SenderType.AI, null);
             return new AssistantResult(
-                "Hey! 👋 I'm your Virtual Mechanic at Mad Garage. It looks like I had a small hiccup. " +
-                "Could you tell me your vehicle's Year, Make & Model so I can find the right parts for you?",
+                errorReply,
                 new ArrayList<>(), true, false
             );
         }
@@ -148,5 +175,30 @@ public class GarageAssistantService {
         if (GREETINGS.contains(lower)) return true;
         // Also catch very short messages with no numbers (unlikely to be a car query)
         return lower.length() <= 4 && !lower.matches(".*\\d.*");
+    }
+
+    private void saveMessage(Long userId, String content, ChatMessage.SenderType sender, String imageUrl) {
+        if (userId == null) return;
+        
+        // Guard: Prevent enormous strings from crashing the DB or audit view
+        String safeContent = (content != null && content.length() > 10000) 
+            ? content.substring(0, 10000) + "... [TRUNCATED]" 
+            : content;
+
+        ChatMessage chatMessage = ChatMessage.builder()
+                .userId(userId)
+                .message(safeContent)
+                .sender(sender)
+                .imageUrl(imageUrl)
+                .build();
+        chatMessageRepository.save(chatMessage);
+    }
+
+    public List<ChatMessage> getChatHistory(Long userId) {
+        return chatMessageRepository.findByUserIdOrderByCreatedAtAsc(userId);
+    }
+
+    public org.springframework.data.domain.Page<ChatMessage> getChatHistoryPaged(Long userId, int page, int size) {
+        return chatMessageRepository.findByUserIdOrderByCreatedAtDesc(userId, org.springframework.data.domain.PageRequest.of(page, size));
     }
 }
