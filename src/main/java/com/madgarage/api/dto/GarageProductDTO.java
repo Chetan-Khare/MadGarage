@@ -17,4 +17,6 @@ public class GarageProductDTO {
     private List<String> imageUrls;
     private Double rating;
     private boolean wholesale;
+    private Double mrp;
+    private Double discountPercentage;
 }

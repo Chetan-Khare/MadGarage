@@ -114,12 +114,12 @@ public class OrderController {
 
     @GetMapping("/{orderId:[0-9]+}")
     public ResponseEntity<?> getOrderDetails(Principal principal, @PathVariable Long orderId) {
-        User customer = userService.getCurrentUser(principal.getName());
+        User requester = userService.getCurrentUser(principal.getName());
         Order order = orderService.getOrderById(orderId);
 
-        assertOrderAccess(order, customer);
+        assertOrderAccess(order, requester);
 
-        OrderResponse response = orderMapper.mapToOrderResponse(order, customer);
+        OrderResponse response = orderMapper.mapToOrderResponse(order, requester);
         return ResponseEntity.ok(response);
     }
 
