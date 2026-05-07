@@ -28,7 +28,10 @@ public class OrderResponse {
     private LocalDateTime orderDate;
     
     @com.fasterxml.jackson.annotation.JsonProperty("isOwner")
-    private boolean owner; // Distinguishes between customer and merchant view
+    private boolean owner;
+
+    public boolean isOwner() { return owner; }
+    public void setOwner(boolean owner) { this.owner = owner; }
     
     // Shipping Details
     private String shippingAddress;
@@ -66,5 +69,8 @@ public class OrderResponse {
         
         @com.fasterxml.jackson.annotation.JsonProperty("isReturnable")
         private boolean returnable;
+
+        public boolean isReturnable() { return returnable; }
+        public void setReturnable(boolean returnable) { this.returnable = returnable; }
     }
 }
