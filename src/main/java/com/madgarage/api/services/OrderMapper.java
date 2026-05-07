@@ -39,7 +39,7 @@ public class OrderMapper {
                         .color(item.getProduct() != null ? item.getProduct().getColor() : "N/A")
                         .quantity(item.getQuantity())
                         .priceAtPurchase(item.getPriceAtPurchase())
-                        .isReturnable(item.getProduct() != null ? item.getProduct().isReturnable() : true)
+                        .returnable(item.getProduct() != null ? item.getProduct().isReturnable() : true)
                         .build())
                 .collect(Collectors.toList());
 
@@ -86,7 +86,7 @@ public class OrderMapper {
                 .deliveryType(order.getDeliveryType())
                 .fittingGarageId(order.getFittingGarageId())
                 .fittingStatus(order.getFittingStatus())
-                .isOwner(isOwner)
+                .owner(isOwner)
                 .active(order.isActive())
                 .items(itemResponses);
 
