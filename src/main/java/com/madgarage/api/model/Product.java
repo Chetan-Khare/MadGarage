@@ -41,6 +41,8 @@ public class Product {
 
     private String category; // e.g., "Brakes", "Filters"
     private Double price; // e.g., 1250.00
+    private Double mrp; // Maximum Retail Price (Original Price)
+    private Double discountPercentage; // Optional individual discount for garages
 
     @Column(length = 1000) // Allows for longer descriptions
     private String description;
@@ -64,6 +66,10 @@ public class Product {
     @Builder.Default
     @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
     private boolean isActive = true;
+
+    @Builder.Default
+    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private boolean isReturnable = true;
 
     @Column(length = 1000)
     private String flagReason;

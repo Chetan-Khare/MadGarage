@@ -15,6 +15,8 @@ public class OrderRequest {
     private String state;
     private String pincode;
 
+    private String couponCode;
+
     private String deliveryType;
     private Long fittingGarageId;
 

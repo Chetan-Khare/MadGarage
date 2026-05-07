@@ -28,11 +28,12 @@ public class OrderService {
     private final SystemSettingService systemSettingService;
     private final OrderMapper orderMapper;
     private final RazorpayService razorpayService;
+    private final CouponService couponService;
 
     public OrderService(OrderRepository orderRepository, ProductRepository productRepository, 
                         OrderRatingRepository orderRatingRepository, PricingService pricingService, 
                         SystemSettingService systemSettingService, OrderMapper orderMapper,
-                        RazorpayService razorpayService) {
+                        RazorpayService razorpayService, CouponService couponService) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.orderRatingRepository = orderRatingRepository;
@@ -40,6 +41,7 @@ public class OrderService {
         this.systemSettingService = systemSettingService;
         this.orderMapper = orderMapper;
         this.razorpayService = razorpayService;
+        this.couponService = couponService;
     }
 
 
@@ -124,7 +126,15 @@ public class OrderService {
             currentShippingFee = 0.0;
         }
 
-        double grandTotal = subtotal + currentShippingFee + currentPlatformFee;
+        // Apply Coupon if provided
+        double discountAmount = 0.0;
+        Coupon appliedCoupon = null;
+        if (request.getCouponCode() != null && !request.getCouponCode().isBlank()) {
+            appliedCoupon = couponService.validateCoupon(request.getCouponCode(), customer, subtotal);
+            discountAmount = couponService.calculateDiscount(appliedCoupon, subtotal);
+        }
+
+        double grandTotal = subtotal + currentShippingFee + currentPlatformFee - discountAmount;
 
         Order order = Order.builder()
                 .user(customer)
@@ -132,6 +142,8 @@ public class OrderService {
                 .taxAmount(taxAmount)
                 .shippingFee(currentShippingFee)
                 .platformFee(currentPlatformFee)
+                .appliedCouponCode(appliedCoupon != null ? appliedCoupon.getCode() : null)
+                .discountAmount(discountAmount)
                 .grandTotal(grandTotal)
                 .status(OrderStatus.PENDING_PAYMENT)
                 .orderDate(LocalDateTime.now())
@@ -149,6 +161,12 @@ public class OrderService {
         }
 
         order = orderRepository.save(order);
+
+        // Record coupon usage if applied
+        if (appliedCoupon != null) {
+            couponService.recordUsage(appliedCoupon, customer, order);
+        }
+
         return orderMapper.mapToOrderResponse(order, customer);
     }
 
@@ -231,6 +249,14 @@ public class OrderService {
         // Action: Restore stock if cancelling
         if (targetStatus == OrderStatus.CANCELLED) {
             restoreStock(order);
+            // Rollback coupon usage
+            if (order.getAppliedCouponCode() != null) {
+                couponService.rollbackUsage(order.getAppliedCouponCode(), order.getId());
+            }
+        }
+
+        if (targetStatus == OrderStatus.DELIVERED && order.getDeliveredAt() == null) {
+            order.setDeliveredAt(LocalDateTime.now());
         }
 
         order.setStatus(targetStatus);
@@ -241,12 +267,16 @@ public class OrderService {
     private boolean isValidTransition(OrderStatus current, OrderStatus target) {
         return switch (current) {
             case PENDING_PAYMENT -> target == OrderStatus.PAID || target == OrderStatus.CANCELLED;
-            case PAID -> target == OrderStatus.PROCESSING || target == OrderStatus.CANCELLED || target == OrderStatus.SHIPPED;
+            case PAID -> target == OrderStatus.PROCESSING || target == OrderStatus.CANCELLED || target == OrderStatus.SHIPPED || target == OrderStatus.DELIVERED;
             case PROCESSING -> target == OrderStatus.SHIPPED || target == OrderStatus.CANCELLED;
             case SHIPPED -> target == OrderStatus.ARRIVED_AT_GARAGE || target == OrderStatus.DELIVERED || target == OrderStatus.CANCELLED;
             case ARRIVED_AT_GARAGE -> target == OrderStatus.DELIVERED || target == OrderStatus.CANCELLED;
-            case DELIVERED -> false; // Final state
+            case DELIVERED -> target == OrderStatus.RETURN_REQUESTED; // Unlock return path
             case CANCELLED -> false; // Final state
+            case RETURN_REQUESTED -> target == OrderStatus.REFUND_IN_PROGRESS || target == OrderStatus.REPLACEMENT_SHIPPING || target == OrderStatus.RETURNED || target == OrderStatus.CANCELLED;
+            case REFUND_IN_PROGRESS -> target == OrderStatus.REFUNDED || target == OrderStatus.CANCELLED;
+            case REPLACEMENT_SHIPPING -> target == OrderStatus.DELIVERED || target == OrderStatus.CANCELLED;
+            default -> false;
         };
     }
 
@@ -259,8 +289,10 @@ public class OrderService {
             case PROCESSING -> role == Role.ROLE_SELLER;
             case SHIPPED -> role == Role.ROLE_SELLER;
             case ARRIVED_AT_GARAGE -> role == Role.ROLE_GARAGE;
-            case DELIVERED -> role == Role.ROLE_SELLER || role == Role.ROLE_GARAGE;
+            case DELIVERED -> role == Role.ROLE_SELLER || role == Role.ROLE_GARAGE || role == Role.ROLE_CUSTOMER;
             case CANCELLED -> (role == Role.ROLE_CUSTOMER && current == OrderStatus.PENDING_PAYMENT);
+            case RETURN_REQUESTED -> role == Role.ROLE_CUSTOMER && current == OrderStatus.DELIVERED;
+            case REFUND_IN_PROGRESS, REFUNDED, REPLACEMENT_SHIPPING, RETURNED -> role == Role.ROLE_ADMIN || role == Role.ROLE_WORKER;
             default -> false;
         };
     }
@@ -273,6 +305,49 @@ public class OrderService {
                 productRepository.save(p);
             }
         }
+    }
+
+    @Transactional
+    public Order createReplacementOrder(Order originalOrder) {
+        Order replacement = Order.builder()
+                .user(originalOrder.getUser())
+                .subtotal(0.0)
+                .taxAmount(0.0)
+                .shippingFee(0.0)
+                .platformFee(0.0)
+                .grandTotal(0.0)
+                .status(OrderStatus.REPLACEMENT_SHIPPING)
+                .orderDate(LocalDateTime.now())
+                .shippingAddress(originalOrder.getShippingAddress())
+                .city(originalOrder.getCity())
+                .state(originalOrder.getState())
+                .pincode(originalOrder.getPincode())
+                .deliveryType(originalOrder.getDeliveryType())
+                .fittingGarageId(originalOrder.getFittingGarageId())
+                .paymentVerified(true) // No payment needed for replacement
+                .build();
+
+        for (OrderItem originalItem : originalOrder.getItems()) {
+            OrderItem replacementItem = OrderItem.builder()
+                    .order(replacement)
+                    .product(originalItem.getProduct())
+                    .quantity(originalItem.getQuantity())
+                    .priceAtPurchase(0.0) // ₹0 for customer
+                    .build();
+            
+            // Deduct stock for the new item
+            if (replacementItem.getProduct() != null) {
+                Product p = replacementItem.getProduct();
+                if (p.getStockQuantity() < replacementItem.getQuantity()) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Insufficient stock for replacement: " + p.getPartName());
+                }
+                p.setStockQuantity(p.getStockQuantity() - replacementItem.getQuantity());
+                productRepository.save(p);
+            }
+            replacement.getItems().add(replacementItem);
+        }
+
+        return orderRepository.save(replacement);
     }
 
     @Transactional

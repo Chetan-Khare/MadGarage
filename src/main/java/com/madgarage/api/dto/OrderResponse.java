@@ -21,9 +21,13 @@ public class OrderResponse {
     private Double platformFee;
     private Double grandTotal;
     private String status;
+    private Double discountAmount;
+    private String appliedCouponCode;
     
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime orderDate;
+    
+    @com.fasterxml.jackson.annotation.JsonProperty("isOwner")
     private boolean isOwner; // Distinguishes between customer and merchant view
     
     // Shipping Details
@@ -31,21 +35,21 @@ public class OrderResponse {
     private String city;
     private String state;
     private String pincode;
-
+ 
     private String deliveryType;
     private Long fittingGarageId;
     private String fittingStatus;
     private String fittingGarageName;
     private String fittingGarageAddress;
-
+ 
     // Rating Details (Optional)
     private Integer partRating;
     private Integer deliveryRating;
     private String ratingComment;
-
+ 
     private boolean active;
     private List<OrderItemResponse> items; // Added to map OrderItems securely
-
+ 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -59,5 +63,8 @@ public class OrderResponse {
         private String color;
         private Integer quantity;
         private Double priceAtPurchase;
+        
+        @com.fasterxml.jackson.annotation.JsonProperty("isReturnable")
+        private boolean isReturnable;
     }
 }

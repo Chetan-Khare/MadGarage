@@ -10,6 +10,8 @@ public class Base64ProductRequest {
     private String partName;
     private String category;
     private Double price;
+    private Double mrp;
+    private Double discountPercentage;
     private String description;
     private Integer stockQuantity;
     private String color;

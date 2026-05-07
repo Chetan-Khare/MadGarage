@@ -40,6 +40,11 @@ public class Order {
     @Enumerated(EnumType.STRING)
     private OrderStatus status;
     private LocalDateTime orderDate;
+    private LocalDateTime deliveredAt;
+
+    // Coupon Details
+    private String appliedCouponCode;
+    private Double discountAmount;
 
     // Shipping Details
     private String shippingAddress;

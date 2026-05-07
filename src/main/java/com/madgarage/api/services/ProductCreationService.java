@@ -109,6 +109,7 @@ public class ProductCreationService {
                     .images(productImages)
                     .seller(seller)
                     .manualRatingOverride(false)
+                    .mrp(price) // Default MRP to Price if not provided via multipart
                     .build();
 
             for (ProductImage pi : productImages) {
@@ -187,6 +188,8 @@ public class ProductCreationService {
                     .flagged(request.getFlagged() != null ? request.getFlagged() : false)
                     .flagReason(request.getFlagReason())
                     .wholesale(request.getWholesale() != null ? request.getWholesale() : true)
+                    .mrp(request.getMrp())
+                    .discountPercentage(request.getDiscountPercentage())
                     .build();
 
             for (ProductImage pi : productImages) {
@@ -279,6 +282,8 @@ public class ProductCreationService {
             }
             if (request.getSellerResponse() != null) product.setSellerResponse(request.getSellerResponse());
             if (request.getWholesale() != null) product.setWholesale(request.getWholesale());
+            product.setMrp(request.getMrp());
+            product.setDiscountPercentage(request.getDiscountPercentage());
 
             productRepository.save(product);
 

@@ -12,11 +12,11 @@ import java.util.UUID;
 public class FileStorageService {
     private static final String UPLOAD_REL = System.getenv("UPLOAD_DIR") != null 
         ? System.getenv("UPLOAD_DIR") + "/uploads/" 
-        : "src/main/resources/static/uploads/";
+        : "data/uploads/";
     
     private static final String GUIDES_REL = System.getenv("UPLOAD_DIR") != null 
         ? System.getenv("UPLOAD_DIR") + "/guides/" 
-        : "src/main/resources/static/guides/";
+        : "data/guides/";
 
     public String saveImage(byte[] bytes, String extension) throws IOException {
         return saveFile(bytes, extension, UPLOAD_REL, "/uploads/");

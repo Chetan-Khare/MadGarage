@@ -18,20 +18,21 @@ public class WebConfig implements WebMvcConfigurer {
         
         String uploadPath = System.getenv("UPLOAD_DIR") != null 
             ? Paths.get(System.getenv("UPLOAD_DIR"), "uploads").toUri().toString()
-            : Paths.get(userDir, "src/main/resources/static/uploads").toUri().toString();
+            : Paths.get(userDir, "data/uploads").toUri().toString();
             
         String guidesPath = System.getenv("UPLOAD_DIR") != null 
             ? Paths.get(System.getenv("UPLOAD_DIR"), "guides").toUri().toString()
-            : Paths.get(userDir, "src/main/resources/static/guides").toUri().toString();
+            : Paths.get(userDir, "data/guides").toUri().toString();
 
-        // Expose the "uploads" folder using physical file system URI (allows runtime uploads to be served)
-        // Ensure trailing slash is present for Spring resource locations
+        // Hardcoded absolute path for Windows environment to ensure reliability
+        String absoluteUploadPath = "file:///C:/Java/api/target/classes/static/uploads/";
+        String absoluteGuidesPath = "file:///C:/Java/api/target/classes/static/guides/";
+
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations(uploadPath.endsWith("/") ? uploadPath : uploadPath + "/");
+                .addResourceLocations(absoluteUploadPath, "classpath:/static/uploads/");
 
-        // Expose the "guides" folder
         registry.addResourceHandler("/guides/**")
-                .addResourceLocations(guidesPath.endsWith("/") ? guidesPath : guidesPath + "/");
+                .addResourceLocations(absoluteGuidesPath, "classpath:/static/guides/");
 
         // Expose the "images" folder (for brand logos)
         // This maps /images/logos/tata.png to src/main/resources/static/images/logos/tata.png

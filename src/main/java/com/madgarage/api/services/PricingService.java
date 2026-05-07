@@ -21,20 +21,26 @@ public class PricingService {
         }
 
         double price = product.getPrice();
-
-        double lowPct = systemSettingService.getSettingDouble("GARAGE_DISCOUNT_LOW_PERCENT", 5.0);
-        double midThreshold = systemSettingService.getSettingDouble("GARAGE_DISCOUNT_MID_THRESHOLD", 10000.0);
-        double midPct = systemSettingService.getSettingDouble("GARAGE_DISCOUNT_MID_PERCENT", 3.0);
-        double highThreshold = systemSettingService.getSettingDouble("GARAGE_DISCOUNT_HIGH_THRESHOLD", 50000.0);
-        double highPct = systemSettingService.getSettingDouble("GARAGE_DISCOUNT_HIGH_PERCENT", 1.0);
-
         double discountPct;
-        if (price >= highThreshold) {
-            discountPct = highPct;
-        } else if (price >= midThreshold) {
-            discountPct = midPct;
+
+        // If product has a custom individual discount, use it primarily
+        if (product.getDiscountPercentage() != null && product.getDiscountPercentage() > 0) {
+            discountPct = product.getDiscountPercentage();
         } else {
-            discountPct = lowPct;
+            // Fallback to tiered system
+            double lowPct = systemSettingService.getSettingDouble("GARAGE_DISCOUNT_LOW_PERCENT", 5.0);
+            double midThreshold = systemSettingService.getSettingDouble("GARAGE_DISCOUNT_MID_THRESHOLD", 10000.0);
+            double midPct = systemSettingService.getSettingDouble("GARAGE_DISCOUNT_MID_PERCENT", 3.0);
+            double highThreshold = systemSettingService.getSettingDouble("GARAGE_DISCOUNT_HIGH_THRESHOLD", 50000.0);
+            double highPct = systemSettingService.getSettingDouble("GARAGE_DISCOUNT_HIGH_PERCENT", 1.0);
+
+            if (price >= highThreshold) {
+                discountPct = highPct;
+            } else if (price >= midThreshold) {
+                discountPct = midPct;
+            } else {
+                discountPct = lowPct;
+            }
         }
 
         double discounted = price * (1.0 - discountPct / 100.0);

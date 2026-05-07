@@ -33,10 +33,18 @@ public class GzipStringConverter implements AttributeConverter<String, byte[]> {
     @Override
     public String convertToEntityAttribute(byte[] dbData) {
         if (dbData == null || dbData.length == 0) return null;
-        try (GZIPInputStream gzis = new GZIPInputStream(new ByteArrayInputStream(dbData))) {
-            return new String(gzis.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to decompress chat message from storage", e);
+
+        // Check for GZIP magic header (0x1f, 0x8b) before attempting decompression
+        if (dbData.length >= 2 && dbData[0] == (byte) 0x1f && dbData[1] == (byte) 0x8b) {
+            try (GZIPInputStream gzis = new GZIPInputStream(new ByteArrayInputStream(dbData))) {
+                return new String(gzis.readAllBytes(), StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                // If decompression fails despite magic header, fallback to raw string to prevent app crash
+                return new String(dbData, StandardCharsets.UTF_8);
+            }
         }
+
+        // Data is not GZIP (likely legacy text), return as raw UTF-8 string
+        return new String(dbData, StandardCharsets.UTF_8);
     }
 }

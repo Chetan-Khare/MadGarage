@@ -91,6 +91,8 @@ public class ProductService {
             dto.setColor(product.getColor());
             dto.setStockQuantity(product.getStockQuantity());
             dto.setWholesale(product.isWholesale());
+            dto.setMrp(product.getMrp());
+            dto.setDiscountPercentage(product.getDiscountPercentage());
             dto.setImageUrls(product.getImages() != null
                     ? product.getImages().stream().map(ProductImage::getImageUrl).collect(Collectors.toList())
                     : java.util.Collections.emptyList());
@@ -131,6 +133,10 @@ public class ProductService {
             product.setCategory(request.getCategory());
         if (request.getPrice() != null)
             product.setPrice(request.getPrice());
+        if (request.getMrp() != null)
+            product.setMrp(request.getMrp());
+        if (request.getDiscountPercentage() != null)
+            product.setDiscountPercentage(request.getDiscountPercentage());
         if (request.getDescription() != null)
             product.setDescription(request.getDescription());
         if (request.getImageUrl() != null)
@@ -191,6 +197,7 @@ public class ProductService {
     // Mapping
     // -----------------------------------------------------------------------
 
+
     /**
      * Maps a Product entity to a safe, outbound ProductResponse DTO.
      */
@@ -202,6 +209,8 @@ public class ProductService {
                 .partName(product.getPartName())
                 .category(product.getCategory())
                 .price(product.getPrice())
+                .mrp(product.getMrp())
+                .discountPercentage(product.getDiscountPercentage())
                 .description(product.getDescription())
                 .imageUrl(product.getImageUrl())
                 .color(product.getColor())

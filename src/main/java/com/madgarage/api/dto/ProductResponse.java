@@ -15,6 +15,8 @@ public class ProductResponse {
     private String partName;
     private String category;
     private Double price;
+    private Double mrp;
+    private Double discountPercentage;
     private String description;
     private String imageUrl;
     private String color;

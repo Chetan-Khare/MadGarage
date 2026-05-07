@@ -39,6 +39,7 @@ public class OrderMapper {
                         .color(item.getProduct() != null ? item.getProduct().getColor() : "N/A")
                         .quantity(item.getQuantity())
                         .priceAtPurchase(item.getPriceAtPurchase())
+                        .isReturnable(item.getProduct() != null ? item.getProduct().isReturnable() : true)
                         .build())
                 .collect(Collectors.toList());
 
@@ -62,6 +63,10 @@ public class OrderMapper {
             grandTotal = subtotal; // Sellers don't receive the platform fee
         }
 
+        Long ownerId = (order.getUser() != null) ? order.getUser().getId() : null;
+        Long reqId = (requester != null) ? requester.getId() : null;
+        boolean isOwner = (ownerId != null && ownerId.equals(reqId)) || (requester != null && requester.getRole() == com.madgarage.api.enums.Role.ROLE_ADMIN);
+
         OrderResponse.OrderResponseBuilder builder = OrderResponse.builder()
                 .id(order.getId())
                 .customerName(custName)
@@ -71,6 +76,8 @@ public class OrderMapper {
                 .platformFee(order.getPlatformFee() != null ? order.getPlatformFee() : 0.0)
                 .grandTotal(grandTotal)
                 .status(order.getStatus() != null ? order.getStatus().name() : null)
+                .appliedCouponCode(order.getAppliedCouponCode())
+                .discountAmount(order.getDiscountAmount() != null ? order.getDiscountAmount() : 0.0)
                 .orderDate(order.getOrderDate())
                 .shippingAddress(order.getShippingAddress())
                 .city(order.getCity())
@@ -79,7 +86,7 @@ public class OrderMapper {
                 .deliveryType(order.getDeliveryType())
                 .fittingGarageId(order.getFittingGarageId())
                 .fittingStatus(order.getFittingStatus())
-                .isOwner(requester != null && order.getUser() != null && order.getUser().getId().equals(requester.getId()))
+                .isOwner(isOwner)
                 .active(order.isActive())
                 .items(itemResponses);
 
