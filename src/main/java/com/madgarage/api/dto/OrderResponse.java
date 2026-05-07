@@ -28,7 +28,7 @@ public class OrderResponse {
     private LocalDateTime orderDate;
     
     @com.fasterxml.jackson.annotation.JsonProperty("isOwner")
-    private boolean isOwner; // Distinguishes between customer and merchant view
+    private boolean owner; // Distinguishes between customer and merchant view
     
     // Shipping Details
     private String shippingAddress;
@@ -65,6 +65,6 @@ public class OrderResponse {
         private Double priceAtPurchase;
         
         @com.fasterxml.jackson.annotation.JsonProperty("isReturnable")
-        private boolean isReturnable;
+        private boolean returnable;
     }
 }
