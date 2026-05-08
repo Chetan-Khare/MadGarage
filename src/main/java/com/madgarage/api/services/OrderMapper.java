@@ -4,6 +4,7 @@ import com.madgarage.api.dto.OrderResponse;
 import com.madgarage.api.model.Order;
 import com.madgarage.api.model.User;
 import com.madgarage.api.repository.OrderRatingRepository;
+import com.madgarage.api.repository.ReturnRepository;
 import com.madgarage.api.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -17,6 +18,7 @@ public class OrderMapper {
     
     private final UserRepository userRepository;
     private final OrderRatingRepository orderRatingRepository;
+    private final ReturnRepository returnRepository;
 
     public OrderResponse mapToOrderResponse(Order order, User requester) {
         boolean isSeller = requester != null && requester.getRole() == com.madgarage.api.enums.Role.ROLE_SELLER;
@@ -89,6 +91,18 @@ public class OrderMapper {
                 .owner(isOwner)
                 .active(order.isActive())
                 .items(itemResponses);
+
+        // Map Return Details
+        returnRepository.findAllByOrderId(order.getId()).stream()
+                .filter(r -> r.getStatus() != com.madgarage.api.enums.ReturnStatus.REJECTED)
+                .findFirst()
+                .ifPresent(r -> {
+                    builder.activeReturnId(r.getId());
+                    builder.returnReason(r.getReason() != null ? r.getReason().name() : "N/A");
+                    builder.returnDescription(r.getDescription());
+                    builder.returnStatus(r.getStatus() != null ? r.getStatus().name() : "PENDING");
+                    builder.returnRequestType(r.getRequestType() != null ? r.getRequestType().name() : "REFUND");
+                });
 
         // Fetch garage details if it's a fitting order
         if (order.getFittingGarageId() != null) {

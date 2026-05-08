@@ -328,6 +328,11 @@ public class OrderService {
                 .build();
 
         for (OrderItem originalItem : originalOrder.getItems()) {
+            // Only replace items that are marked as returnable
+            if (originalItem.getProduct() == null || !originalItem.getProduct().isReturnable()) {
+                continue;
+            }
+
             OrderItem replacementItem = OrderItem.builder()
                     .order(replacement)
                     .product(originalItem.getProduct())

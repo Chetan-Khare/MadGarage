@@ -8,6 +8,7 @@ import com.madgarage.api.model.Order;
 import com.madgarage.api.model.ReturnRequest;
 import com.madgarage.api.model.User;
 import com.madgarage.api.repository.OrderRepository;
+import com.madgarage.api.repository.ProductRepository;
 import com.madgarage.api.repository.ReturnRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,7 @@ public class ReturnService {
 
     private final ReturnRepository returnRepository;
     private final OrderRepository orderRepository;
+    private final ProductRepository productRepository;
     private final OrderService orderService;
 
     @Transactional
@@ -42,9 +44,12 @@ public class ReturnService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return window of 7 days after delivery has expired");
         }
 
-        // Validation: Existing request
-        if (returnRepository.findByOrderId(order.getId()).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "A return request is already pending for this order");
+        // Validation: Existing request (Only block if there is a non-rejected request)
+        boolean hasActiveRequest = returnRepository.findAllByOrderId(order.getId()).stream()
+                .anyMatch(r -> r.getStatus() != ReturnStatus.REJECTED);
+        
+        if (hasActiveRequest) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "An active return protocol is already in sync for this order");
         }
 
         // Validation: Returnable items
@@ -116,8 +121,28 @@ public class ReturnService {
         ReturnRequest request = returnRepository.findById(returnId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found"));
 
+        if (request.getStatus() != ReturnStatus.APPROVED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only approved returns can be marked as picked up");
+        }
+
         request.setStatus(ReturnStatus.PICKED_UP);
+        
+        // Restore stock if the item is fit for resale (e.g., WRONG_FITMENT)
+        if (request.getReason() == com.madgarage.api.enums.ReturnReason.WRONG_FITMENT) {
+            restoreOrderStock(request.getOrder());
+        }
+        
         return returnRepository.save(request);
+    }
+
+    private void restoreOrderStock(Order order) {
+        for (com.madgarage.api.model.OrderItem item : order.getItems()) {
+            if (item.getProduct() != null && item.getProduct().isReturnable()) {
+                com.madgarage.api.model.Product p = item.getProduct();
+                p.setStockQuantity(p.getStockQuantity() + item.getQuantity());
+                productRepository.save(p);
+            }
+        }
     }
 
     @Transactional

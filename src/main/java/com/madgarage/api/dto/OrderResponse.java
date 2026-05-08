@@ -51,6 +51,11 @@ public class OrderResponse {
     private String ratingComment;
  
     private boolean active;
+    private Long activeReturnId;
+    private String returnReason;
+    private String returnDescription;
+    private String returnStatus;
+    private String returnRequestType;
     private List<OrderItemResponse> items; // Added to map OrderItems securely
  
     @Data

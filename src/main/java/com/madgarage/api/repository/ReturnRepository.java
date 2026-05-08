@@ -8,6 +8,7 @@ import java.util.Optional;
 
 public interface ReturnRepository extends JpaRepository<ReturnRequest, Long> {
     List<ReturnRequest> findByUserId(Long userId);
-    Optional<ReturnRequest> findByOrderId(Long orderId);
+    List<ReturnRequest> findAllByOrderId(Long orderId);
+    Optional<ReturnRequest> findTopByOrderIdOrderByIdDesc(Long orderId);
     List<ReturnRequest> findByStatus(ReturnStatus status);
 }

@@ -5,5 +5,6 @@ public enum ReturnStatus {
     APPROVED,
     PICKED_UP,
     REFUNDED,
-    REJECTED
+    REJECTED,
+    COMPLETED
 }
