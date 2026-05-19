@@ -51,13 +51,13 @@ public class CouponController {
 
     @PostMapping("/admin")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> createCoupon(@RequestBody Coupon coupon) {
+    public ResponseEntity<?> createCoupon(@jakarta.validation.Valid @RequestBody com.madgarage.api.dto.CouponRequest coupon) {
         return ResponseEntity.ok(couponService.createCoupon(coupon));
     }
 
     @PutMapping("/admin/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateCoupon(@PathVariable Long id, @RequestBody Coupon coupon) {
+    public ResponseEntity<?> updateCoupon(@PathVariable Long id, @jakarta.validation.Valid @RequestBody com.madgarage.api.dto.CouponRequest coupon) {
         return ResponseEntity.ok(couponService.updateCoupon(id, coupon));
     }
 }

@@ -20,7 +20,48 @@ public class OrderMapper {
     private final OrderRatingRepository orderRatingRepository;
     private final ReturnRepository returnRepository;
 
+    public List<OrderResponse> mapToOrderResponses(List<Order> orders, User requester) {
+        if (orders == null || orders.isEmpty()) return List.of();
+
+        List<Long> orderIds = orders.stream().map(Order::getId).collect(Collectors.toList());
+        List<Long> garageIds = orders.stream()
+                .map(Order::getFittingGarageId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+
+        // Batch prefetch returns
+        java.util.Map<Long, List<com.madgarage.api.model.ReturnRequest>> returnsByOrderId = returnRepository.findAllByOrderIdIn(orderIds).stream()
+                .collect(Collectors.groupingBy(r -> r.getOrder().getId()));
+
+        // Batch prefetch garages
+        java.util.Map<Long, User> garagesById = garageIds.isEmpty() ? java.util.Map.of() :
+                userRepository.findAllById(garageIds).stream()
+                .collect(Collectors.toMap(User::getId, g -> g));
+
+        // Batch prefetch ratings
+        java.util.Map<Long, com.madgarage.api.model.OrderRating> ratingsByOrderId = orderRatingRepository.findAllByOrderIdIn(orderIds).stream()
+                .collect(Collectors.toMap(r -> r.getOrder().getId(), r -> r, (r1, r2) -> r1));
+
+        return orders.stream()
+                .map(order -> mapToOrderResponseInternal(order, requester, 
+                        returnsByOrderId.getOrDefault(order.getId(), List.of()),
+                        garagesById.get(order.getFittingGarageId()),
+                        ratingsByOrderId.get(order.getId())))
+                .collect(Collectors.toList());
+    }
+
     public OrderResponse mapToOrderResponse(Order order, User requester) {
+        List<com.madgarage.api.model.ReturnRequest> returns = returnRepository.findAllByOrderId(order.getId());
+        User garage = order.getFittingGarageId() != null ? userRepository.findById(order.getFittingGarageId()).orElse(null) : null;
+        com.madgarage.api.model.OrderRating rating = orderRatingRepository.findByOrderId(order.getId()).orElse(null);
+        return mapToOrderResponseInternal(order, requester, returns, garage, rating);
+    }
+
+    private OrderResponse mapToOrderResponseInternal(Order order, User requester, 
+                                                    List<com.madgarage.api.model.ReturnRequest> returns, 
+                                                    User garage, 
+                                                    com.madgarage.api.model.OrderRating rating) {
         boolean isSeller = requester != null && requester.getRole() == com.madgarage.api.enums.Role.ROLE_SELLER;
 
         List<OrderResponse.OrderItemResponse> itemResponses = order.getItems().stream()
@@ -67,7 +108,8 @@ public class OrderMapper {
 
         Long ownerId = (order.getUser() != null) ? order.getUser().getId() : null;
         Long reqId = (requester != null) ? requester.getId() : null;
-        boolean isOwner = (ownerId != null && ownerId.equals(reqId)) || (requester != null && requester.getRole() == com.madgarage.api.enums.Role.ROLE_ADMIN);
+        // LOW-06 FIX: Restrict isOwner check strictly to matching user IDs (do not conflate admin role as owner)
+        boolean isOwner = (ownerId != null && ownerId.equals(reqId));
 
         OrderResponse.OrderResponseBuilder builder = OrderResponse.builder()
                 .id(order.getId())
@@ -93,7 +135,7 @@ public class OrderMapper {
                 .items(itemResponses);
 
         // Map Return Details
-        returnRepository.findAllByOrderId(order.getId()).stream()
+        returns.stream()
                 .filter(r -> r.getStatus() != com.madgarage.api.enums.ReturnStatus.REJECTED)
                 .findFirst()
                 .ifPresent(r -> {
@@ -105,19 +147,17 @@ public class OrderMapper {
                 });
 
         // Fetch garage details if it's a fitting order
-        if (order.getFittingGarageId() != null) {
-            userRepository.findById(order.getFittingGarageId()).ifPresent(garage -> {
-                builder.fittingGarageName(garage.getFullName());
-                builder.fittingGarageAddress((garage.getAddress() != null ? garage.getAddress() + ", " : "") + garage.getCity());
-            });
+        if (order.getFittingGarageId() != null && garage != null) {
+            builder.fittingGarageName(garage.getFullName());
+            builder.fittingGarageAddress((garage.getAddress() != null ? garage.getAddress() + ", " : "") + garage.getCity());
         }
 
         // Fetch rating if exists
-        orderRatingRepository.findByOrderId(order.getId()).ifPresent(rating -> {
+        if (rating != null) {
             builder.partRating(rating.getPartRating());
             builder.deliveryRating(rating.getDeliveryRating());
             builder.ratingComment(rating.getComment());
-        });
+        }
 
         return builder.build();
     }

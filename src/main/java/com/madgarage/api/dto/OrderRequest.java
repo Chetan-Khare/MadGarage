@@ -7,6 +7,9 @@ import java.util.List;
 
 @Data
 public class OrderRequest {
+    @jakarta.validation.constraints.NotNull(message = "Order items list cannot be null")
+    @jakarta.validation.constraints.NotEmpty(message = "Order items list cannot be empty")
+    @jakarta.validation.Valid
     private List<CartItemDto> items;
     
     // Shipping Details

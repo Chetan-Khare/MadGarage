@@ -1,6 +1,7 @@
 package com.madgarage.api.dto;
 import lombok.Data;
 import java.util.List;
+import com.madgarage.api.enums.ShippingClass;
 
 @Data
 public class GarageProductDTO {
@@ -19,4 +20,8 @@ public class GarageProductDTO {
     private boolean wholesale;
     private Double mrp;
     private Double discountPercentage;
+    private ShippingClass shippingClass;
+    private Double weightKg;
+    private Double customShippingCost;
+    private String sellerState;
 }

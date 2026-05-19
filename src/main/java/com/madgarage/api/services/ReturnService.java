@@ -33,6 +33,11 @@ public class ReturnService {
         Order order = orderRepository.findById(dto.getOrderId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
 
+        // CRIT-02 FIX: Ownership check to verify customer owns the order
+        if (order.getUser() == null || !order.getUser().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not own this order.");
+        }
+
         // Validation: Eligibility
         if (order.getStatus() != OrderStatus.DELIVERED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only delivered orders can be returned");
@@ -138,7 +143,9 @@ public class ReturnService {
     private void restoreOrderStock(Order order) {
         for (com.madgarage.api.model.OrderItem item : order.getItems()) {
             if (item.getProduct() != null && item.getProduct().isReturnable()) {
-                com.madgarage.api.model.Product p = item.getProduct();
+                // HIGH-04 FIX: Use pessimistic write lock to avoid lost updates under concurrency
+                com.madgarage.api.model.Product p = productRepository.findByIdWithLock(item.getProduct().getId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found: " + item.getProduct().getId()));
                 p.setStockQuantity(p.getStockQuantity() + item.getQuantity());
                 productRepository.save(p);
             }
@@ -161,17 +168,26 @@ public class ReturnService {
         order.setStatus(OrderStatus.REFUNDED);
         orderRepository.save(order);
 
+        // CRIT-03 FIX: Restore stock for all reasons. Since WRONG_FITMENT is already restored in markPickedUp(),
+        // we restore stock here for other reasons (e.g. DAMAGED or OTHER returns to be inspected/restocked).
+        if (request.getReason() != com.madgarage.api.enums.ReturnReason.WRONG_FITMENT) {
+            restoreOrderStock(order);
+        }
+
         return returnRepository.save(request);
     }
 
+    @Transactional(readOnly = true)
     public List<ReturnRequest> getMyReturns(User user) {
         return returnRepository.findByUserId(user.getId());
     }
 
+    @Transactional(readOnly = true)
     public List<ReturnRequest> getAllReturns() {
         return returnRepository.findAll();
     }
     
+    @Transactional(readOnly = true)
     public List<ReturnRequest> getReturnsByStatus(ReturnStatus status) {
         return returnRepository.findByStatus(status);
     }

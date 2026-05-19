@@ -25,14 +25,14 @@ public class ReturnController {
     private final UserService userService;
 
     @PostMapping
-    @org.springframework.transaction.annotation.Transactional
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('GARAGE') or hasRole('ADMIN')")
     public ResponseEntity<ReturnResponseDto> createReturnRequest(Principal principal, @RequestBody ReturnRequestDto dto) {
         User user = userService.getCurrentUser(principal.getName());
         return ResponseEntity.ok(mapToDto(returnService.createReturnRequest(user, dto)));
     }
 
     @GetMapping("/my")
-    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('GARAGE') or hasRole('ADMIN')")
     public ResponseEntity<List<ReturnResponseDto>> getMyReturns(Principal principal) {
         User user = userService.getCurrentUser(principal.getName());
         return ResponseEntity.ok(returnService.getMyReturns(user).stream()
@@ -41,7 +41,6 @@ public class ReturnController {
     }
 
     @GetMapping("/admin")
-    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @PreAuthorize("hasRole('ADMIN') or hasRole('WORKER')")
     public ResponseEntity<List<ReturnResponseDto>> getAllReturns(@RequestParam(required = false) ReturnStatus status) {
         List<ReturnRequest> returns = (status != null) ? 
@@ -53,7 +52,6 @@ public class ReturnController {
     }
 
     @PutMapping("/admin/{id}/approve")
-    @org.springframework.transaction.annotation.Transactional
     @PreAuthorize("hasRole('ADMIN') or hasRole('WORKER')")
     public ResponseEntity<ReturnResponseDto> approveReturn(Principal principal, @PathVariable Long id) {
         User admin = userService.getCurrentUser(principal.getName());
@@ -61,7 +59,6 @@ public class ReturnController {
     }
 
     @PutMapping("/admin/{id}/reject")
-    @org.springframework.transaction.annotation.Transactional
     @PreAuthorize("hasRole('ADMIN') or hasRole('WORKER')")
     public ResponseEntity<ReturnResponseDto> rejectReturn(Principal principal, @PathVariable Long id, @RequestParam String note) {
         User admin = userService.getCurrentUser(principal.getName());
@@ -69,14 +66,12 @@ public class ReturnController {
     }
 
     @PutMapping("/admin/{id}/picked-up")
-    @org.springframework.transaction.annotation.Transactional
     @PreAuthorize("hasRole('ADMIN') or hasRole('WORKER')")
     public ResponseEntity<ReturnResponseDto> markPickedUp(@PathVariable Long id) {
         return ResponseEntity.ok(mapToDto(returnService.markPickedUp(id)));
     }
 
     @PutMapping("/admin/{id}/finalize")
-    @org.springframework.transaction.annotation.Transactional
     @PreAuthorize("hasRole('ADMIN') or hasRole('WORKER')")
     public ResponseEntity<ReturnResponseDto> finalizeRefund(@PathVariable Long id) {
         return ResponseEntity.ok(mapToDto(returnService.finalizeRefund(id)));

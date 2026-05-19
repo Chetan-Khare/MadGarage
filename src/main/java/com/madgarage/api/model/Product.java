@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import com.madgarage.api.enums.FitmentCategory;
 import com.madgarage.api.enums.PartCondition;
+import com.madgarage.api.enums.ShippingClass;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.util.ArrayList;
@@ -83,6 +84,18 @@ public class Product {
     @Enumerated(EnumType.STRING)
     @Column(name = "part_condition")
     private PartCondition condition;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "shipping_class", nullable = false)
+    @Builder.Default
+    private ShippingClass shippingClass = ShippingClass.STANDARD;
+
+    @Column(name = "weight_kg")
+    @Builder.Default
+    private Double weightKg = 1.0;
+
+    @Column(name = "custom_shipping_cost")
+    private Double customShippingCost;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "seller_id")

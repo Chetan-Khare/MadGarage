@@ -48,31 +48,31 @@ public class OrderService {
     public List<OrderResponse> getCustomerOrders(User customer) {
         // ARCH-03 FIX: Uses JOIN FETCH to load everything in one SQL query
         List<Order> rawOrders = orderRepository.findByUserWithItems(customer);
-        return rawOrders.stream()
+        List<Order> filtered = rawOrders.stream()
                 .filter(order -> order.isActive() && order.getStatus() != OrderStatus.PENDING_PAYMENT)
-                .map(order -> orderMapper.mapToOrderResponse(order, customer))
                 .collect(Collectors.toList());
+        return orderMapper.mapToOrderResponses(filtered, customer);
     }
 
     public List<OrderResponse> getSellerOrders(User seller) {
-        return orderRepository.findAllBySeller(seller).stream()
+        List<Order> rawOrders = orderRepository.findAllBySeller(seller).stream()
                 .filter(Order::isActive)
-                .map(order -> orderMapper.mapToOrderResponse(order, seller))
                 .collect(Collectors.toList());
+        return orderMapper.mapToOrderResponses(rawOrders, seller);
     }
 
     public List<OrderResponse> getAllOrdersAsDto() {
-        return orderRepository.findAllWithItems().stream()
+        List<Order> rawOrders = orderRepository.findAllWithItems().stream()
                 .filter(order -> order.isActive() && order.getStatus() != OrderStatus.PENDING_PAYMENT)
-                .map(order -> orderMapper.mapToOrderResponse(order, null))
                 .collect(Collectors.toList());
+        return orderMapper.mapToOrderResponses(rawOrders, null);
     }
 
     public List<OrderResponse> getGarageFittings(User garage) {
-        return orderRepository.findByFittingGarageIdWithItems(garage.getId()).stream()
+        List<Order> rawOrders = orderRepository.findByFittingGarageIdWithItems(garage.getId()).stream()
                 .filter(Order::isActive)
-                .map(order -> orderMapper.mapToOrderResponse(order, garage))
                 .collect(Collectors.toList());
+        return orderMapper.mapToOrderResponses(rawOrders, garage);
     }
 
 
@@ -118,19 +118,15 @@ public class OrderService {
 
         double taxAmount = 0.0; // Tax is already included in product price
         
-        double currentShippingFee = systemSettingService.getSettingDouble("SHIPPING_FEE", 250.0);
-        double freeShippingThreshold = systemSettingService.getSettingDouble("FREE_SHIPPING_THRESHOLD", 400.0);
+        double currentShippingFee = calculateDynamicShippingFee(customer, request.getItems());
         double currentPlatformFee = systemSettingService.getSettingDouble("PLATFORM_FEE", 7.0);
-
-        if (subtotal >= freeShippingThreshold) {
-            currentShippingFee = 0.0;
-        }
 
         // Apply Coupon if provided
         double discountAmount = 0.0;
         Coupon appliedCoupon = null;
         if (request.getCouponCode() != null && !request.getCouponCode().isBlank()) {
-            appliedCoupon = couponService.validateCoupon(request.getCouponCode(), customer, subtotal);
+            // CRIT-01 FIX: Acquire pessimistic write lock during validation/checkout transaction
+            appliedCoupon = couponService.validateCouponWithLock(request.getCouponCode(), customer, subtotal);
             discountAmount = couponService.calculateDiscount(appliedCoupon, subtotal);
         }
 
@@ -289,7 +285,13 @@ public class OrderService {
             case PROCESSING -> role == Role.ROLE_SELLER;
             case SHIPPED -> role == Role.ROLE_SELLER;
             case ARRIVED_AT_GARAGE -> role == Role.ROLE_GARAGE;
-            case DELIVERED -> role == Role.ROLE_SELLER || role == Role.ROLE_GARAGE || role == Role.ROLE_CUSTOMER;
+            case DELIVERED -> {
+                // MED-08 FIX: Customer can only confirm delivery from SHIPPED or ARRIVED_AT_GARAGE
+                if (role == Role.ROLE_CUSTOMER) {
+                    yield current == OrderStatus.SHIPPED || current == OrderStatus.ARRIVED_AT_GARAGE;
+                }
+                yield role == Role.ROLE_SELLER || role == Role.ROLE_GARAGE;
+            }
             case CANCELLED -> (role == Role.ROLE_CUSTOMER && current == OrderStatus.PENDING_PAYMENT);
             case RETURN_REQUESTED -> role == Role.ROLE_CUSTOMER && current == OrderStatus.DELIVERED;
             case REFUND_IN_PROGRESS, REFUNDED, REPLACEMENT_SHIPPING, RETURNED -> role == Role.ROLE_ADMIN || role == Role.ROLE_WORKER;
@@ -300,7 +302,9 @@ public class OrderService {
     private void restoreStock(Order order) {
         for (OrderItem item : order.getItems()) {
             if (item.getProduct() != null) {
-                Product p = item.getProduct();
+                // HIGH-04 FIX: Use pessimistic write lock to prevent lost updates under concurrency
+                Product p = productRepository.findByIdWithLock(item.getProduct().getId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found: " + item.getProduct().getId()));
                 p.setStockQuantity(p.getStockQuantity() + item.getQuantity());
                 productRepository.save(p);
             }
@@ -342,7 +346,9 @@ public class OrderService {
             
             // Deduct stock for the new item
             if (replacementItem.getProduct() != null) {
-                Product p = replacementItem.getProduct();
+                // HIGH-04 FIX: Use pessimistic write lock to prevent lost updates under concurrency
+                Product p = productRepository.findByIdWithLock(replacementItem.getProduct().getId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found: " + replacementItem.getProduct().getId()));
                 if (p.getStockQuantity() < replacementItem.getQuantity()) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Insufficient stock for replacement: " + p.getPartName());
                 }
@@ -419,8 +425,84 @@ public class OrderService {
         
         for (Order order : staleOrders) {
             restoreStock(order);
+            // MED-09 FIX: Rollback coupon usage if coupon was applied to the stale order
+            if (order.getAppliedCouponCode() != null) {
+                couponService.rollbackUsage(order.getAppliedCouponCode(), order.getId());
+            }
             order.setStatus(OrderStatus.CANCELLED);
             orderRepository.save(order);
         }
+    }
+
+    public double calculateDynamicShippingFee(User customer, List<OrderRequest.CartItemDto> items) {
+        double totalShipping = 0.0;
+        
+        // Load shipping settings from DB with robust fallbacks
+        double baseStandardFee = systemSettingService.getSettingDouble("SHIPPING_FEE_STANDARD", 150.0);
+        double fragileSurcharge = systemSettingService.getSettingDouble("SHIPPING_FEE_FRAGILE", 1200.0);
+        double freightBaseFee = systemSettingService.getSettingDouble("SHIPPING_FEE_FREIGHT_BASE", 2000.0);
+        double freightPerKgRate = systemSettingService.getSettingDouble("SHIPPING_FEE_FREIGHT_PER_KG", 15.0);
+
+        boolean hasFragileOrFreight = false;
+
+        for (OrderRequest.CartItemDto itemDto : items) {
+            Product product = productRepository.findById(itemDto.getProductId())
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Product not found ID: " + itemDto.getProductId()));
+                
+            int qty = itemDto.getQuantity();
+            ShippingClass sClass = product.getShippingClass() != null 
+                    ? product.getShippingClass() : ShippingClass.STANDARD;
+
+            switch (sClass) {
+                case CUSTOM_RATE:
+                    double customFee = product.getCustomShippingCost() != null ? product.getCustomShippingCost() : 0.0;
+                    totalShipping += (customFee * qty);
+                    hasFragileOrFreight = true; // Exclude from free shipping threshold
+                    break;
+                    
+                case HEAVY_FREIGHT:
+                    double weight = product.getWeightKg() != null ? product.getWeightKg() : 1.0;
+                    double freightFee = freightBaseFee + (weight * freightPerKgRate);
+                    
+                    // Apply distance-based multiplier (interstate vs local)
+                    double distanceMultiplier = 1.0;
+                    if (product.getSeller() != null && product.getSeller().getState() != null 
+                            && customer.getState() != null 
+                            && !product.getSeller().getState().equalsIgnoreCase(customer.getState())) {
+                        distanceMultiplier = 1.5; // Interstate long-haul LTL surface multiplier
+                    }
+                    totalShipping += (freightFee * distanceMultiplier * qty);
+                    hasFragileOrFreight = true;
+                    break;
+                    
+                case FRAGILE:
+                    totalShipping += (baseStandardFee + fragileSurcharge) * qty;
+                    hasFragileOrFreight = true;
+                    break;
+                    
+                case STANDARD:
+                default:
+                    totalShipping += baseStandardFee * qty;
+                    break;
+            }
+        }
+
+        // Apply Free Shipping Threshold ONLY if there are no fragile/freight/custom items
+        if (!hasFragileOrFreight) {
+            double freeShippingThreshold = systemSettingService.getSettingDouble("FREE_SHIPPING_THRESHOLD", 400.0);
+            double subtotal = 0.0;
+            for (OrderRequest.CartItemDto itemDto : items) {
+                Product product = productRepository.findById(itemDto.getProductId()).orElse(null);
+                if (product != null) {
+                    subtotal += product.getPrice() * itemDto.getQuantity();
+                }
+            }
+            if (subtotal >= freeShippingThreshold) {
+                totalShipping = 0.0;
+            }
+        }
+        
+        return totalShipping;
     }
 }

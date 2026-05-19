@@ -1,5 +1,6 @@
 package com.madgarage.api.services;
 
+import com.madgarage.api.dto.CouponRequest;
 import com.madgarage.api.model.Coupon;
 import com.madgarage.api.model.CouponUsage;
 import com.madgarage.api.model.Order;
@@ -26,10 +27,19 @@ public class CouponService {
     public List<Coupon> getAvailableCoupons(User user) {
         LocalDateTime now = LocalDateTime.now();
         List<Coupon> activeCoupons = couponRepository.findActiveCoupons(now);
+        if (activeCoupons.isEmpty()) return List.of();
+
+        List<Long> couponIds = activeCoupons.stream().map(Coupon::getId).collect(Collectors.toList());
+        List<Object[]> usageCounts = couponUsageRepository.countUsagesByUserAndCouponIds(user.getId(), couponIds);
+        java.util.Map<Long, Long> usageMap = usageCounts.stream()
+                .collect(Collectors.toMap(
+                        arr -> (Long) arr[0],
+                        arr -> (Long) arr[1]
+                ));
         
         // Filter out coupons that the user has already maxed out
         return activeCoupons.stream()
-                .filter(c -> couponUsageRepository.countByCouponIdAndUserId(c.getId(), user.getId()) < c.getMaxUsagePerUser())
+                .filter(c -> usageMap.getOrDefault(c.getId(), 0L) < c.getMaxUsagePerUser())
                 .collect(Collectors.toList());
     }
 
@@ -37,6 +47,18 @@ public class CouponService {
         Coupon coupon = couponRepository.findByCodeIgnoreCase(code)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Coupon code not found."));
 
+        return validateCouponInternal(coupon, user, orderAmount);
+    }
+
+    @Transactional
+    public Coupon validateCouponWithLock(String code, User user, Double orderAmount) {
+        Coupon coupon = couponRepository.findByCodeIgnoreCaseWithLock(code)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Coupon code not found."));
+
+        return validateCouponInternal(coupon, user, orderAmount);
+    }
+
+    private Coupon validateCouponInternal(Coupon coupon, User user, Double orderAmount) {
         if (!coupon.isActive()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This coupon is no longer active.");
         }
@@ -57,8 +79,10 @@ public class CouponService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You have already used this coupon.");
         }
 
-        if (orderAmount < coupon.getMinOrderAmount()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Minimum order amount of ₹" + coupon.getMinOrderAmount() + " required to use this coupon.");
+        // MED-02 FIX: Prevent NullPointerException if minOrderAmount is null
+        double minOrder = coupon.getMinOrderAmount() != null ? coupon.getMinOrderAmount() : 0.0;
+        if (orderAmount < minOrder) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Minimum order amount of ₹" + minOrder + " required to use this coupon.");
         }
 
         return coupon;
@@ -106,23 +130,38 @@ public class CouponService {
         return couponRepository.findAll();
     }
     
-    public Coupon createCoupon(Coupon coupon) {
+    public Coupon createCoupon(CouponRequest req) {
+        Coupon coupon = Coupon.builder()
+                .code(req.getCode().toUpperCase().trim())
+                .description(req.getDescription())
+                .discountType(req.getDiscountType())
+                .discountAmount(req.getDiscountAmount())
+                .minOrderAmount(req.getMinOrderAmount() != null ? req.getMinOrderAmount() : 0.0)
+                .maxDiscountAmount(req.getMaxDiscountAmount())
+                .usageLimit(req.getUsageLimit())
+                .maxUsagePerUser(req.getMaxUsagePerUser() != null ? req.getMaxUsagePerUser() : 1)
+                .startDate(req.getStartDate())
+                .endDate(req.getEndDate())
+                .isActive(req.getIsActive() != null ? req.getIsActive() : true)
+                .build();
         return couponRepository.save(coupon);
     }
     
-    public Coupon updateCoupon(Long id, Coupon details) {
+    public Coupon updateCoupon(Long id, CouponRequest req) {
         Coupon coupon = couponRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Coupon not found."));
-        coupon.setDescription(details.getDescription());
-        coupon.setDiscountType(details.getDiscountType());
-        coupon.setDiscountAmount(details.getDiscountAmount());
-        coupon.setMinOrderAmount(details.getMinOrderAmount());
-        coupon.setMaxDiscountAmount(details.getMaxDiscountAmount());
-        coupon.setUsageLimit(details.getUsageLimit());
-        coupon.setMaxUsagePerUser(details.getMaxUsagePerUser());
-        coupon.setStartDate(details.getStartDate());
-        coupon.setEndDate(details.getEndDate());
-        coupon.setActive(details.isActive());
+        coupon.setDescription(req.getDescription());
+        coupon.setDiscountType(req.getDiscountType());
+        coupon.setDiscountAmount(req.getDiscountAmount());
+        coupon.setMinOrderAmount(req.getMinOrderAmount() != null ? req.getMinOrderAmount() : 0.0);
+        coupon.setMaxDiscountAmount(req.getMaxDiscountAmount());
+        coupon.setUsageLimit(req.getUsageLimit());
+        coupon.setMaxUsagePerUser(req.getMaxUsagePerUser() != null ? req.getMaxUsagePerUser() : 1);
+        coupon.setStartDate(req.getStartDate());
+        coupon.setEndDate(req.getEndDate());
+        if (req.getIsActive() != null) {
+            coupon.setActive(req.getIsActive());
+        }
         return couponRepository.save(coupon);
     }
 }

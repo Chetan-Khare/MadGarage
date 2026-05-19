@@ -4,6 +4,7 @@ import com.madgarage.api.dto.Base64ProductRequest;
 import com.madgarage.api.enums.FitmentCategory;
 import com.madgarage.api.enums.PartCondition;
 import com.madgarage.api.enums.Role;
+import com.madgarage.api.enums.ShippingClass;
 import com.madgarage.api.model.Product;
 import com.madgarage.api.model.ProductImage;
 import com.madgarage.api.model.User;
@@ -190,6 +191,9 @@ public class ProductCreationService {
                     .wholesale(request.getWholesale() != null ? request.getWholesale() : true)
                     .mrp(request.getMrp())
                     .discountPercentage(request.getDiscountPercentage())
+                    .shippingClass(request.getShippingClass() != null ? ShippingClass.valueOf(request.getShippingClass().toUpperCase()) : ShippingClass.STANDARD)
+                    .weightKg(request.getWeightKg() != null ? request.getWeightKg() : 1.0)
+                    .customShippingCost(request.getCustomShippingCost())
                     .build();
 
             for (ProductImage pi : productImages) {
@@ -284,6 +288,13 @@ public class ProductCreationService {
             if (request.getWholesale() != null) product.setWholesale(request.getWholesale());
             product.setMrp(request.getMrp());
             product.setDiscountPercentage(request.getDiscountPercentage());
+            if (request.getShippingClass() != null) {
+                product.setShippingClass(ShippingClass.valueOf(request.getShippingClass().toUpperCase()));
+            }
+            if (request.getWeightKg() != null) {
+                product.setWeightKg(request.getWeightKg());
+            }
+            product.setCustomShippingCost(request.getCustomShippingCost());
 
             productRepository.save(product);
 

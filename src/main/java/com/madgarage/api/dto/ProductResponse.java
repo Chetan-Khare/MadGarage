@@ -2,6 +2,7 @@ package com.madgarage.api.dto;
 
 import com.madgarage.api.enums.FitmentCategory;
 import com.madgarage.api.enums.PartCondition;
+import com.madgarage.api.enums.ShippingClass;
 import lombok.Builder;
 import lombok.Data;
 import java.util.List;
@@ -33,4 +34,8 @@ public class ProductResponse {
     private Double rating;
     private boolean wholesale;
     private boolean active;
+    private ShippingClass shippingClass;
+    private Double weightKg;
+    private Double customShippingCost;
+    private String sellerState;
 }

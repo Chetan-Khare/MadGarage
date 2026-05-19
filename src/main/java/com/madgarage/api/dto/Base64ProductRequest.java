@@ -31,4 +31,7 @@ public class Base64ProductRequest {
     private Double rating;
     private String flagReason;
     private Boolean wholesale;
+    private String shippingClass;
+    private Double weightKg;
+    private Double customShippingCost;
 }

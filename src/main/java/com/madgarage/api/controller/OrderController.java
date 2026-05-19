@@ -63,14 +63,9 @@ public class OrderController {
     @PostMapping("/checkout")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'GARAGE', 'ADMIN')")
     public ResponseEntity<?> checkout(Principal principal, @Valid @RequestBody OrderRequest request) {
-        try {
-            User customer = userService.getCurrentUser(principal.getName());
-            OrderResponse response = orderService.placeOrder(customer, request);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", e.getMessage() != null ? e.getMessage() : "Internal Server Error"));
-        }
+        User customer = userService.getCurrentUser(principal.getName());
+        OrderResponse response = orderService.placeOrder(customer, request);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{orderId:[0-9]+}/rzp-id")

@@ -93,6 +93,10 @@ public class ProductService {
             dto.setWholesale(product.isWholesale());
             dto.setMrp(product.getMrp());
             dto.setDiscountPercentage(product.getDiscountPercentage());
+            dto.setShippingClass(product.getShippingClass());
+            dto.setWeightKg(product.getWeightKg());
+            dto.setCustomShippingCost(product.getCustomShippingCost());
+            dto.setSellerState(product.getSeller() != null ? product.getSeller().getState() : null);
             dto.setImageUrls(product.getImages() != null
                     ? product.getImages().stream().map(ProductImage::getImageUrl).collect(Collectors.toList())
                     : java.util.Collections.emptyList());
@@ -159,6 +163,9 @@ public class ProductService {
         if (request.getFlagReason() != null) product.setFlagReason(request.getFlagReason());
         if (request.getSellerResponse() != null) product.setSellerResponse(request.getSellerResponse());
         if (request.getWholesale() != null) product.setWholesale(request.getWholesale());
+        if (request.getShippingClass() != null) product.setShippingClass(request.getShippingClass());
+        if (request.getWeightKg() != null) product.setWeightKg(request.getWeightKg());
+        product.setCustomShippingCost(request.getCustomShippingCost());
 
         productRepository.save(product);
     }
@@ -229,6 +236,10 @@ public class ProductService {
                 .rating(product.isManualRatingOverride() ? product.getManualRating() : 4.8)
                 .wholesale(product.isWholesale())
                 .active(product.isActive())
+                .shippingClass(product.getShippingClass())
+                .weightKg(product.getWeightKg())
+                .customShippingCost(product.getCustomShippingCost())
+                .sellerState(product.getSeller() != null ? product.getSeller().getState() : null)
                 .build();
     }
 }

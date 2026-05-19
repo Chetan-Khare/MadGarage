@@ -24,15 +24,18 @@ public class WebConfig implements WebMvcConfigurer {
             ? Paths.get(System.getenv("UPLOAD_DIR"), "guides").toUri().toString()
             : Paths.get(userDir, "data/guides").toUri().toString();
 
-        // Hardcoded absolute path for Windows environment to ensure reliability
-        String absoluteUploadPath = "file:///C:/Java/api/target/classes/static/uploads/";
-        String absoluteGuidesPath = "file:///C:/Java/api/target/classes/static/guides/";
+        if (!uploadPath.endsWith("/")) {
+            uploadPath += "/";
+        }
+        if (!guidesPath.endsWith("/")) {
+            guidesPath += "/";
+        }
 
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations(absoluteUploadPath, "classpath:/static/uploads/");
+                .addResourceLocations(uploadPath, "classpath:/static/uploads/");
 
         registry.addResourceHandler("/guides/**")
-                .addResourceLocations(absoluteGuidesPath, "classpath:/static/guides/");
+                .addResourceLocations(guidesPath, "classpath:/static/guides/");
 
         // Expose the "images" folder (for brand logos)
         // This maps /images/logos/tata.png to src/main/resources/static/images/logos/tata.png
