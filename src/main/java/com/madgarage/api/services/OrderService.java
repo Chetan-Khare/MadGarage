@@ -26,19 +26,21 @@ public class OrderService {
     private final OrderRatingRepository orderRatingRepository;
     private final PricingService pricingService;
     private final SystemSettingService systemSettingService;
+    private final ShippingZoneService shippingZoneService;
     private final OrderMapper orderMapper;
     private final RazorpayService razorpayService;
     private final CouponService couponService;
 
     public OrderService(OrderRepository orderRepository, ProductRepository productRepository, 
                         OrderRatingRepository orderRatingRepository, PricingService pricingService, 
-                        SystemSettingService systemSettingService, OrderMapper orderMapper,
-                        RazorpayService razorpayService, CouponService couponService) {
+                        SystemSettingService systemSettingService, ShippingZoneService shippingZoneService,
+                        OrderMapper orderMapper, RazorpayService razorpayService, CouponService couponService) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.orderRatingRepository = orderRatingRepository;
         this.pricingService = pricingService;
         this.systemSettingService = systemSettingService;
+        this.shippingZoneService = shippingZoneService;
         this.orderMapper = orderMapper;
         this.razorpayService = razorpayService;
         this.couponService = couponService;
@@ -465,13 +467,13 @@ public class OrderService {
                     double weight = product.getWeightKg() != null ? product.getWeightKg() : 1.0;
                     double freightFee = freightBaseFee + (weight * freightPerKgRate);
                     
-                    // Apply distance-based multiplier (interstate vs local)
-                    double distanceMultiplier = 1.0;
-                    if (product.getSeller() != null && product.getSeller().getState() != null 
-                            && customer.getState() != null 
-                            && !product.getSeller().getState().equalsIgnoreCase(customer.getState())) {
-                        distanceMultiplier = 1.5; // Interstate long-haul LTL surface multiplier
-                    }
+                    // Apply zone-graduated distance multiplier (HEAVY_FREIGHT only)
+                    String sellerState = product.getSeller() != null ? product.getSeller().getState() : null;
+                    String buyerState = customer.getState();
+                    int sellerZone = (sellerState != null) ? shippingZoneService.getZoneForState(sellerState) : 1;
+                    int buyerZone = (buyerState != null) ? shippingZoneService.getZoneForState(buyerState) : 1;
+                    double distanceMultiplier = shippingZoneService.getFreightMultiplier(sellerZone, buyerZone);
+                    
                     totalShipping += (freightFee * distanceMultiplier * qty);
                     hasFragileOrFreight = true;
                     break;

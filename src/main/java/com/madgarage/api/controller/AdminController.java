@@ -7,6 +7,7 @@ import com.madgarage.api.dto.ProductResponse;
 import com.madgarage.api.dto.UserProfileResponse;
 import com.madgarage.api.services.OrderService;
 import com.madgarage.api.services.ProductService;
+import com.madgarage.api.services.SystemSettingService;
 import com.madgarage.api.services.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -27,12 +28,14 @@ public class AdminController {
     private final UserService userService;
     private final OrderService orderService;
     private final ProductService productService;
+    private final SystemSettingService systemSettingService;
     private final com.madgarage.api.repository.SystemSettingRepository settingRepository;
 
-    public AdminController(UserService userService, OrderService orderService, ProductService productService, com.madgarage.api.repository.SystemSettingRepository settingRepository) {
+    public AdminController(UserService userService, OrderService orderService, ProductService productService, SystemSettingService systemSettingService, com.madgarage.api.repository.SystemSettingRepository settingRepository) {
         this.userService = userService;
         this.orderService = orderService;
         this.productService = productService;
+        this.systemSettingService = systemSettingService;
         this.settingRepository = settingRepository;
     }
 
@@ -154,6 +157,9 @@ public class AdminController {
         
         setting.setConfigValue(value);
         settingRepository.save(setting);
+        
+        // Evict settings and publicConfig caches so the new value is immediately live
+        systemSettingService.evictSettingsCache();
         
         return ResponseEntity.ok("Setting '" + key + "' updated successfully!");
     }
