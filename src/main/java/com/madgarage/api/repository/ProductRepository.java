@@ -17,11 +17,15 @@ import java.util.List;
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
+    @Override
+    @EntityGraph(attributePaths = {"images", "seller"})
+    Optional<Product> findById(Long id);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Product p WHERE p.id = :id")
     Optional<Product> findByIdWithLock(@Param("id") Long id);
 
-    @EntityGraph(attributePaths = {"images"})
+    @EntityGraph(attributePaths = {"images", "seller"})
         @Query("SELECT p FROM Product p JOIN p.fittedVehicles v " +
                         "WHERE v.carModel.make.name = :makeName " +
                         "AND v.carModel.name = :modelName " +
@@ -39,20 +43,20 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                         @Param("engineType") String engineType,
                         @Param("partCategory") String partCategory);
 
-        @EntityGraph(attributePaths = {"images"})
+        @EntityGraph(attributePaths = {"images", "seller"})
         List<Product> findByFittedVehiclesId(Long vehicleId);
 
-        @EntityGraph(attributePaths = {"images"})
+        @EntityGraph(attributePaths = {"images", "seller"})
         List<Product> findByCategoryAndFittedVehiclesId(String category, Long vehicleId);
 
-        @EntityGraph(attributePaths = {"images"})
+        @EntityGraph(attributePaths = {"images", "seller"})
         List<Product> findByFitmentCategory(FitmentCategory fitmentCategory);
 
-        @EntityGraph(attributePaths = {"images"})
+        @EntityGraph(attributePaths = {"images", "seller"})
         List<Product> findAll();
 
         long countBySeller(User seller);
 
-        @EntityGraph(attributePaths = {"images"})
+        @EntityGraph(attributePaths = {"images", "seller"})
         List<Product> findBySeller(User seller);
 }

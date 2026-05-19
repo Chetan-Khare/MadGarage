@@ -25,9 +25,7 @@ public class ProductController {
     @GetMapping
     public List<ProductResponse> getAllProducts(@RequestParam(required = false) String category,
                                                 @RequestParam(required = false) Long vehicleId) {
-        List<ProductResponse> products = productService.getAllProducts(category, vehicleId);
-        System.out.println("DEBUG: ProductController.getAllProducts returned " + products.size() + " products for category: " + category);
-        return products;
+        return productService.getAllProducts(category, vehicleId);
     }
 
     @GetMapping("/garage")
