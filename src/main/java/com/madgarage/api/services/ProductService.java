@@ -97,6 +97,7 @@ public class ProductService {
             dto.setWeightKg(product.getWeightKg());
             dto.setCustomShippingCost(product.getCustomShippingCost());
             dto.setSellerState(product.getSeller() != null ? product.getSeller().getState() : null);
+            dto.setReturnable(product.isReturnable());
             dto.setImageUrls(product.getImages() != null
                     ? product.getImages().stream().map(ProductImage::getImageUrl).collect(Collectors.toList())
                     : java.util.Collections.emptyList());
@@ -166,6 +167,7 @@ public class ProductService {
         if (request.getShippingClass() != null) product.setShippingClass(request.getShippingClass());
         if (request.getWeightKg() != null) product.setWeightKg(request.getWeightKg());
         product.setCustomShippingCost(request.getCustomShippingCost());
+        if (request.getIsReturnable() != null) product.setReturnable(request.getIsReturnable());
 
         productRepository.save(product);
     }
@@ -240,6 +242,7 @@ public class ProductService {
                 .weightKg(product.getWeightKg())
                 .customShippingCost(product.getCustomShippingCost())
                 .sellerState(product.getSeller() != null ? product.getSeller().getState() : null)
+                .isReturnable(product.isReturnable())
                 .build();
     }
 }

@@ -24,4 +24,7 @@ public class GarageProductDTO {
     private Double weightKg;
     private Double customShippingCost;
     private String sellerState;
+    
+    @com.fasterxml.jackson.annotation.JsonProperty("isReturnable")
+    private boolean isReturnable = true;
 }

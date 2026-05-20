@@ -34,4 +34,7 @@ public class Base64ProductRequest {
     private String shippingClass;
     private Double weightKg;
     private Double customShippingCost;
+    
+    @com.fasterxml.jackson.annotation.JsonProperty("isReturnable")
+    private Boolean isReturnable;
 }

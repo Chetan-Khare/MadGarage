@@ -38,4 +38,8 @@ public class ProductResponse {
     private Double weightKg;
     private Double customShippingCost;
     private String sellerState;
+    
+    @com.fasterxml.jackson.annotation.JsonProperty("isReturnable")
+    @Builder.Default
+    private boolean isReturnable = true;
 }

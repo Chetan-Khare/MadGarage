@@ -194,6 +194,7 @@ public class ProductCreationService {
                     .shippingClass(request.getShippingClass() != null ? ShippingClass.valueOf(request.getShippingClass().toUpperCase()) : ShippingClass.STANDARD)
                     .weightKg(request.getWeightKg() != null ? request.getWeightKg() : 1.0)
                     .customShippingCost(request.getCustomShippingCost())
+                    .isReturnable(request.getIsReturnable() != null ? request.getIsReturnable() : true)
                     .build();
 
             for (ProductImage pi : productImages) {
@@ -295,6 +296,9 @@ public class ProductCreationService {
                 product.setWeightKg(request.getWeightKg());
             }
             product.setCustomShippingCost(request.getCustomShippingCost());
+            if (request.getIsReturnable() != null) {
+                product.setReturnable(request.getIsReturnable());
+            }
 
             productRepository.save(product);
 
