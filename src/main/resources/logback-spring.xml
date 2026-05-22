@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Mad Garage API — Production-Ready Logback Configuration
+    =========================================================
+    Goals:
+      1. Log Level Control  — Only INFO+ from our code; WARN+ from noisy frameworks.
+      2. Log Retention      — Daily rotation, 14-day retention, 500MB total cap.
+      3. Sampling/Filtering — DuplicateMessageFilter to suppress repetitive log lines.
+      4. Async I/O          — File writes are non-blocking (AsyncAppender) to avoid
+                              disk I/O stalling request threads.
+    =========================================================
+-->
+<configuration>
+
+    <!-- Read spring properties into logback context -->
+    <springProperty scope="context" name="APP_NAME"  source="spring.application.name" defaultValue="mad-garage-api"/>
+    <springProperty scope="context" name="LOG_PATH"  source="logging.file.path"        defaultValue="logs"/>
+
+    <!-- ================================================================
+         FILTER: Suppress duplicate / repetitive log lines
+         Allows each unique message to appear at most once per 60 seconds.
+         This is the "Log Sampling" mechanism — free, zero-dependency.
+         ================================================================ -->
+    <turboFilter class="ch.qos.logback.classic.turbo.DuplicateMessageFilter">
+        <CacheSize>500</CacheSize>
+        <!-- After 30 identical messages the line is silenced; resets every 60 s -->
+        <AllowedRepetitions>30</AllowedRepetitions>
+    </turboFilter>
+
+    <!-- ================================================================
+         APPENDER 1: CONSOLE
+         Plain-text, colored output for Docker/systemd/cloud stdout capture.
+         ================================================================ -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%-5level) [%15.15thread] %cyan(%-40.40logger{39}) : %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- ================================================================
+         APPENDER 2: ROLLING_FILE — General application log
+         · Rolls daily AND when file exceeds 50 MB
+         · Keeps 14 days of history
+         · Total size cap: 500 MB (auto-deletes oldest files first)
+         · Old files are GZip-compressed to save disk space
+         ================================================================ -->
+    <appender name="ROLLING_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/${APP_NAME}.log</file>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{40} : %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/archive/${APP_NAME}-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>50MB</maxFileSize>
+            <maxHistory>14</maxHistory>
+            <totalSizeCap>500MB</totalSizeCap>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
+        </rollingPolicy>
+        <!-- Only write INFO and above to this file -->
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>INFO</level>
+        </filter>
+    </appender>
+
+    <!-- ================================================================
+         APPENDER 3: ERROR_FILE — Errors-only log
+         · Longer retention (30 days) — errors need longer audit window
+         · Dedicated file makes alerting / on-call triage easy
+         ================================================================ -->
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/${APP_NAME}-error.log</file>
+        <encoder>
+            <!-- Full stack trace on errors -->
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{40} : %msg%n%ex{full}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/archive/${APP_NAME}-error-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>200MB</totalSizeCap>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
+        </rollingPolicy>
+        <!-- Only ERROR level -->
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+    </appender>
+
+    <!-- ================================================================
+         ASYNC WRAPPERS
+         Wraps file appenders so log writes happen on a background thread.
+         This prevents disk I/O from blocking HTTP request threads.
+         discardingThreshold=0  — never silently drop logs even under load.
+         ================================================================ -->
+    <appender name="ASYNC_ROLLING" class="ch.qos.logback.classic.AsyncAppender">
+        <discardingThreshold>0</discardingThreshold>
+        <queueSize>512</queueSize>
+        <appender-ref ref="ROLLING_FILE"/>
+    </appender>
+
+    <appender name="ASYNC_ERROR" class="ch.qos.logback.classic.AsyncAppender">
+        <discardingThreshold>0</discardingThreshold>
+        <queueSize>256</queueSize>
+        <appender-ref ref="ERROR_FILE"/>
+    </appender>
+
+    <!-- ================================================================
+         NOISE SUPPRESSION — Third-Party / Framework Loggers
+         Set all chatty framework packages to WARN.
+         Only log when something is actually wrong.
+         ================================================================ -->
+
+    <!-- Hibernate: suppress per-query SQL binding logs -->
+    <logger name="org.hibernate"                            level="WARN"/>
+    <logger name="org.hibernate.SQL"                        level="WARN"/>
+    <logger name="org.hibernate.orm.jdbc.bind"              level="WARN"/>
+    <logger name="org.hibernate.engine.transaction"         level="WARN"/>
+
+    <!-- Spring Framework internals -->
+    <logger name="org.springframework"                      level="WARN"/>
+    <logger name="org.springframework.security"             level="WARN"/>
+    <logger name="org.springframework.web"                  level="WARN"/>
+    <logger name="org.springframework.boot.autoconfigure"   level="WARN"/>
+    <logger name="org.springframework.cache"                level="WARN"/>
+    <logger name="org.springframework.ai"                   level="WARN"/>
+    <!-- Silence the intentional AuthenticationProvider warning — our custom provider is deliberate -->
+    <logger name="org.springframework.security.config.annotation.authentication.configuration.InitializeUserDetailsBeanManagerConfigurer" level="ERROR"/>
+
+    <!-- Connection pool — log only when pool is exhausted -->
+    <logger name="com.zaxxer.hikari"                        level="WARN"/>
+    <logger name="com.zaxxer.hikari.pool"                   level="WARN"/>
+
+    <!-- Tomcat / Servlet -->
+    <logger name="org.apache.tomcat"                        level="WARN"/>
+    <logger name="org.apache.catalina"                      level="WARN"/>
+    <logger name="org.apache.coyote"                        level="WARN"/>
+
+    <!-- Keep Flyway at INFO — useful to see migration progress on startup -->
+    <logger name="org.flywaydb"                             level="INFO"/>
+
+    <!-- Other libraries -->
+    <logger name="com.github.benmanes.caffeine"             level="WARN"/>
+    <logger name="io.github.bucket4j"                       level="WARN"/>
+    <logger name="okhttp3"                                  level="WARN"/>
+    <logger name="com.razorpay"                             level="WARN"/>
+
+    <!-- ================================================================
+         OUR APPLICATION CODE — com.madgarage
+         Always INFO (or DEBUG in local dev — see profile below)
+         ================================================================ -->
+    <logger name="com.madgarage" level="INFO"/>
+
+    <!-- ================================================================
+         PROFILE: local
+         Console-only output + DEBUG level for our own code.
+         No file appenders to avoid filling developer disk.
+         ================================================================ -->
+    <springProfile name="local">
+        <logger name="com.madgarage" level="DEBUG"/>
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- ================================================================
+         PROFILE: default (production / staging)
+         Console (captured by hosting platform) + Rolling files.
+         Root is WARN to suppress any unhandled framework noise.
+         ================================================================ -->
+    <springProfile name="!local">
+        <root level="WARN">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_ROLLING"/>
+            <appender-ref ref="ASYNC_ERROR"/>
+        </root>
+    </springProfile>
+
+</configuration>

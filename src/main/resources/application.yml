@@ -28,7 +28,6 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       max-lifetime: 580000 # Retire connections before MySQL (600s) kills them
-      idle-timeout: 300000 # 5 minutes
       connection-timeout: 20000 # 20 seconds
 
   # Spring Boot 3 SQL Initialization
@@ -79,9 +78,15 @@ server:
     min-response-size: 1024
 
 logging:
+  # Log files are written here. Override with LOGGING_FILE_PATH env var on the server.
+  # Rotation, retention (14 days), and level control live in logback-spring.xml.
+  file:
+    path: ${LOGGING_FILE_PATH:logs}
   level:
-    org.apache.tomcat: INFO
-    org.springframework.web.multipart: INFO
+    # Ensure Flyway migration steps stay visible at startup
+    org.flywaydb: INFO
+    # Our application code — INFO by default; logback-spring.xml overrides to DEBUG in 'local' profile
+    com.madgarage: INFO
 
 # P1 FIX: JWT secret has NO fallback value.
 # The app will throw IllegalArgumentException on startup if JWT_SECRET env var is missing.

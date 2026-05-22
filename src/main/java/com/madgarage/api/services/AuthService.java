@@ -223,7 +223,7 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This account has been deactivated. Access denied.");
         }
 
-        log.info("[Auth] Login SUCCESSFUL for userId: {} [{}]", user.getId(), email);
+        log.info("[Auth] Login SUCCESSFUL for userId: {}", user.getId());
         String token = jwtService.generateToken(user);
         return AuthResponse.builder()
                 .token(token)

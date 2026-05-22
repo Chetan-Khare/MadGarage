@@ -124,7 +124,7 @@ public class UserService {
             }
         }
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
-            log.info("[Identity] Updating password for user: {}", user.getEmail());
+            log.info("[Identity] Password update requested for userId: {}", user.getId());
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
         if (request.getAddress() != null) {
@@ -152,12 +152,12 @@ public class UserService {
             user.setLongitude(request.getLongitude());
         }
 
-        log.info("[Identity] Persisting profile changes for userId: {} | New Email: {}", user.getId(), user.getEmail());
+        log.info("[Identity] Persisting profile changes for userId: {}", user.getId());
         user = userRepository.save(user);
         
         UserProfileResponse response = toProfileResponse(user);
         if (emailChanged) {
-            log.info("[Identity] Email changed, generating a refreshed session token for user: {}", user.getEmail());
+            log.info("[Identity] Email changed — refreshed session token issued for userId: {}", user.getId());
             response.setToken(jwtService.generateToken(user));
         }
         return response;
@@ -376,7 +376,7 @@ public class UserService {
             user.setIsTieUp(request.getIsTieUp());
         }
 
-        log.info("[Admin] Persisting identity revision for userId: {} by administrative action. New Email: {}", id, user.getEmail());
+        log.info("[Admin] Persisting identity revision for userId: {} by administrative action.", id);
         userRepository.save(user);
     }
 

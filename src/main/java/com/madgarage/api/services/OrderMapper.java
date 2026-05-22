@@ -46,7 +46,7 @@ public class OrderMapper {
         return orders.stream()
                 .map(order -> mapToOrderResponseInternal(order, requester, 
                         returnsByOrderId.getOrDefault(order.getId(), List.of()),
-                        garagesById.get(order.getFittingGarageId()),
+                        order.getFittingGarageId() != null ? garagesById.get(order.getFittingGarageId()) : null,
                         ratingsByOrderId.get(order.getId())))
                 .collect(Collectors.toList());
     }

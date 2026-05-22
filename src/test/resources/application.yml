@@ -1,0 +1,32 @@
+# Test-environment overrides.
+# Provides dummy values for all required env-var placeholders so the Spring
+# context wires up without a running database or real secrets.
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+
+  flyway:
+    enabled: false   # Flyway migrations target MySQL; disable for in-memory H2 tests
+
+  ai:
+    google:
+      genai:
+        api-key: test-gemini-key-not-real
+
+app:
+  jwt:
+    secret: dGVzdC1zZWNyZXQta2V5LXRoYXQtaXMtYXQtbGVhc3QtMjU2LWJpdHMtbG9uZy1mb3ItdGVzdGluZw==
+  seed:
+    password: test-password
+  razorpay:
+    key-id: test-razorpay-key-id
+    key-secret: test-razorpay-key-secret
