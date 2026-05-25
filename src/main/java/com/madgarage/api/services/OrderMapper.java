@@ -135,16 +135,23 @@ public class OrderMapper {
                 .items(itemResponses);
 
         // Map Return Details
-        returns.stream()
+        com.madgarage.api.model.ReturnRequest activeReturn = returns.stream()
                 .filter(r -> r.getStatus() != com.madgarage.api.enums.ReturnStatus.REJECTED)
                 .findFirst()
-                .ifPresent(r -> {
-                    builder.activeReturnId(r.getId());
-                    builder.returnReason(r.getReason() != null ? r.getReason().name() : "N/A");
-                    builder.returnDescription(r.getDescription());
-                    builder.returnStatus(r.getStatus() != null ? r.getStatus().name() : "PENDING");
-                    builder.returnRequestType(r.getRequestType() != null ? r.getRequestType().name() : "REFUND");
-                });
+                .orElse(returns.stream()
+                        .filter(r -> r.getStatus() == com.madgarage.api.enums.ReturnStatus.REJECTED)
+                        .reduce((first, second) -> second)
+                        .orElse(null));
+
+        if (activeReturn != null) {
+            builder.activeReturnId(activeReturn.getId());
+            builder.returnReason(activeReturn.getReason() != null ? activeReturn.getReason().name() : "N/A");
+            builder.returnDescription(activeReturn.getDescription());
+            builder.returnStatus(activeReturn.getStatus() != null ? activeReturn.getStatus().name() : "PENDING");
+            builder.returnRequestType(activeReturn.getRequestType() != null ? activeReturn.getRequestType().name() : "REFUND");
+            builder.returnAdminNote(activeReturn.getAdminNote());
+            builder.adminNote(activeReturn.getAdminNote());
+        }
 
         // Fetch garage details if it's a fitting order
         if (order.getFittingGarageId() != null && garage != null) {

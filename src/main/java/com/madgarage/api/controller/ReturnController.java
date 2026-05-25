@@ -80,9 +80,9 @@ public class ReturnController {
     private ReturnResponseDto mapToDto(ReturnRequest request) {
         ReturnResponseDto dto = new ReturnResponseDto();
         dto.setId(request.getId());
-        dto.setOrderId(request.getOrder().getId());
-        dto.setUserId(request.getUser().getId());
-        dto.setCustomerName(request.getUser().getFirstName() + " " + request.getUser().getLastName());
+        dto.setOrderId(request.getOrder() != null ? request.getOrder().getId() : null);
+        dto.setUserId(request.getUser() != null ? request.getUser().getId() : null);
+        dto.setCustomerName(request.getUser() != null ? request.getUser().getFirstName() + " " + request.getUser().getLastName() : "Unknown");
         dto.setReason(request.getReason());
         dto.setRequestType(request.getRequestType());
         dto.setDescription(request.getDescription());

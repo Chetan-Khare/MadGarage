@@ -95,11 +95,8 @@ public class ReturnService {
 
         if (request.getRequestType() == ReturnRequestType.REFUND) {
             order.setStatus(OrderStatus.REFUND_IN_PROGRESS);
-        } else if (request.getRequestType() == ReturnRequestType.REPLACEMENT) {
-            Order replacementOrder = orderService.createReplacementOrder(order);
-            request.setReplacementOrderId(replacementOrder.getId());
-            order.setStatus(OrderStatus.REPLACEMENT_SHIPPING);
         }
+        // For REPLACEMENT, original order status remains RETURN_REQUESTED until picked up.
 
         orderRepository.save(order);
         return returnRepository.save(request);
@@ -131,10 +128,18 @@ public class ReturnService {
         }
 
         request.setStatus(ReturnStatus.PICKED_UP);
-        
+        Order order = request.getOrder();
+
+        if (request.getRequestType() == ReturnRequestType.REPLACEMENT) {
+            Order replacementOrder = orderService.createReplacementOrder(order);
+            request.setReplacementOrderId(replacementOrder.getId());
+            order.setStatus(OrderStatus.REPLACEMENT_SHIPPING);
+            orderRepository.save(order);
+        }
+
         // Restore stock if the item is fit for resale (e.g., WRONG_FITMENT)
         if (request.getReason() == com.madgarage.api.enums.ReturnReason.WRONG_FITMENT) {
-            restoreOrderStock(request.getOrder());
+            restoreOrderStock(order);
         }
         
         return returnRepository.save(request);

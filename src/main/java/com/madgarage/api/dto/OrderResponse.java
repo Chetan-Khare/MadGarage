@@ -56,6 +56,8 @@ public class OrderResponse {
     private String returnDescription;
     private String returnStatus;
     private String returnRequestType;
+    private String returnAdminNote;
+    private String adminNote;
     private List<OrderItemResponse> items; // Added to map OrderItems securely
  
     @Data
