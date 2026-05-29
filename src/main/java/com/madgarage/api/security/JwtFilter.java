@@ -17,6 +17,7 @@ import java.util.Collections;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(JwtFilter.class);
 
     private final JwtService jwtService;
 
@@ -64,7 +65,7 @@ public class JwtFilter extends OncePerRequestFilter {
             }
         } catch (Exception e) {
             // Token is invalid or expired
-            System.out.println("Invalid JWT Token: " + e.getMessage());
+            log.warn("[Security] Invalid JWT token rejected: {}", e.getMessage());
         }
 
         filterChain.doFilter(request, response);

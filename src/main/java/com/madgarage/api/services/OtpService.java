@@ -18,6 +18,7 @@ public class OtpService {
     private static final int OTP_EXPIRY_MINUTES = 5;
     private final OtpRepository otpRepository;
     private final PasswordEncoder passwordEncoder;
+    private final org.springframework.core.env.Environment environment;
     private final Random random = new SecureRandom();
 
     @Transactional
@@ -39,11 +40,16 @@ public class OtpService {
     @org.springframework.beans.factory.annotation.Value("${app.master-otp:#{null}}")
     private String masterOtp;
 
+    private boolean isDevOrLocalProfile() {
+        return java.util.Arrays.asList(environment.getActiveProfiles()).contains("local")
+                || java.util.Arrays.asList(environment.getActiveProfiles()).contains("dev");
+    }
+
     @Transactional
     public boolean verifyOtp(String phone, String inputOtp) {
         // P0 TEST FIX: Master OTP bypass for development
         String trimmedOtp = inputOtp != null ? inputOtp.trim() : "";
-        if (masterOtp != null && masterOtp.equals(trimmedOtp)) {
+        if (masterOtp != null && masterOtp.equals(trimmedOtp) && isDevOrLocalProfile()) {
             return true;
         }
 

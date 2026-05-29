@@ -118,9 +118,10 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOriginPatterns(List.of(
-                "*",
-                "http://localhost:8081",
-                "http://localhost:3000"));
+                "https://www.madgarage.in",
+                "https://madgarage.in",
+                "http://localhost:3000",
+                "http://localhost:8081"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization", "Content-Disposition"));

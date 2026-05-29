@@ -66,6 +66,7 @@ spring:
 
 # Tomcat connector config — remove default file-part count limit for multi-image uploads
 server:
+  forward-headers-strategy: NATIVE
   tomcat:
     max-parameter-count: -1
     max-http-form-post-size: -1

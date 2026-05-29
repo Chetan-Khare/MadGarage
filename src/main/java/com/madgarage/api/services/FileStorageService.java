@@ -10,6 +10,7 @@ import java.util.UUID;
 
 @Service
 public class FileStorageService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(FileStorageService.class);
     private static final String UPLOAD_REL = System.getenv("UPLOAD_DIR") != null 
         ? System.getenv("UPLOAD_DIR") + "/uploads/" 
         : "data/uploads/";
@@ -53,7 +54,7 @@ public class FileStorageService {
         }
 
         try {
-            String fileName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+            String fileName = Paths.get(new java.net.URI(fileUrl).getPath()).getFileName().toString();
             Path base = Paths.get(System.getProperty("user.dir"), relPath).toAbsolutePath().normalize();
             Path target = base.resolve(fileName).normalize();
 
@@ -63,7 +64,7 @@ public class FileStorageService {
             }
         } catch (Exception e) {
             // Log error but don't fail the request (the DB record update is more important)
-            System.err.println("Failed to delete physical file: " + fileUrl);
+            log.error("Failed to delete physical file: " + fileUrl, e);
         }
     }
 }

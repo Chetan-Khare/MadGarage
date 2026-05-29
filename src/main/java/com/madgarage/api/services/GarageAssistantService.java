@@ -104,7 +104,9 @@ public class GarageAssistantService {
                     .system(systemPrompt)
                     .user(u -> {
                         // Wrapping user input in delimiters to separate it from instructions
-                        u.text("USER INPUT TO ANALYZE: \n###\n" + text + "\n###");
+                        // Strip or escape '###' to prevent delimiter escape in prompt injection.
+                        String safeText = text != null ? text.replace("###", "---") : "";
+                        u.text("USER INPUT TO ANALYZE: \n###\n" + safeText + "\n###");
                         if (uploadedImages != null && !uploadedImages.isEmpty()) {
                             for (byte[] img : uploadedImages) {
                                 if (img != null && img.length > 0) {
