@@ -93,6 +93,13 @@ public class OrderController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/{orderId:[0-9]+}/cancel")
+    public ResponseEntity<?> cancelOrder(Principal principal, @PathVariable Long orderId) {
+        User customer = userService.getCurrentUser(principal.getName());
+        OrderResponse response = orderService.cancelOrder(orderId, customer);
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/{orderId:[0-9]+}/invoice")
     public ResponseEntity<byte[]> getInvoice(Principal principal, @PathVariable Long orderId) {
         User customer = userService.getCurrentUser(principal.getName());

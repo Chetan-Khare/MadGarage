@@ -2,6 +2,7 @@ package com.madgarage.api.controller;
 
 import com.madgarage.api.dto.GarageProductDTO;
 import com.madgarage.api.dto.ProductResponse;
+import com.madgarage.api.dto.BulkProductStockResponse;
 import com.madgarage.api.services.ProductService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -35,7 +36,12 @@ public class ProductController {
         return productService.getGarageProducts(category, vehicleId);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/bulk")
+    public List<BulkProductStockResponse> getBulkStock(@RequestParam List<Long> ids) {
+        return productService.getBulkStock(ids);
+    }
+
+    @GetMapping("/{id:\\d+}")
     public ProductResponse getProductById(@PathVariable Long id) {
         return productService.getProductById(id);
     }

@@ -262,6 +262,44 @@ public class OrderService {
         return orderMapper.mapToOrderResponse(order, order.getUser());
     }
 
+    @Transactional
+    public OrderResponse cancelOrder(Long orderId, User customer) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found."));
+
+        if (!order.getUser().getId().equals(customer.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to cancel this order.");
+        }
+
+        OrderStatus currentStatus = order.getStatus();
+        if (currentStatus != OrderStatus.PENDING_PAYMENT && currentStatus != OrderStatus.PAID && currentStatus != OrderStatus.PROCESSING) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order cannot be cancelled at this stage. Please request a return after delivery.");
+        }
+
+        // 1. Restore Stock
+        restoreStock(order);
+
+        // 2. Rollback Coupon
+        if (order.getAppliedCouponCode() != null) {
+            couponService.rollbackUsage(order.getAppliedCouponCode(), order.getId());
+        }
+
+        // 3. Process Instant Razorpay Refund if applicable
+        if (currentStatus == OrderStatus.PAID || currentStatus == OrderStatus.PROCESSING) {
+            if (order.getPaymentId() != null && !order.getPaymentId().isBlank()) {
+                try {
+                    razorpayService.refundPayment(order.getPaymentId(), order.getGrandTotal(), "cancel_" + order.getId());
+                } catch (com.razorpay.RazorpayException e) {
+                    throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to process Razorpay refund: " + e.getMessage());
+                }
+            }
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
+        order = orderRepository.save(order);
+        return orderMapper.mapToOrderResponse(order, customer);
+    }
+
     private boolean isValidTransition(OrderStatus current, OrderStatus target) {
         return switch (current) {
             case PENDING_PAYMENT -> target == OrderStatus.PAID || target == OrderStatus.CANCELLED;

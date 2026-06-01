@@ -6,6 +6,8 @@ import com.madgarage.api.enums.ReturnStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.ArrayList;
 
 @Entity
 @Table(name = "return_requests")
@@ -44,6 +46,14 @@ public class ReturnRequest {
     private ReturnStatus status;
 
     private Long replacementOrderId; // Reference to the new order if replacement
+
+    @OneToMany(mappedBy = "returnRequest", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @Builder.Default
+    private List<ReturnRequestItem> items = new ArrayList<>();
+
+    private Double refundAmount;
+
+    private String refundId;
 
     private String adminNote;
 

@@ -1,33 +1,30 @@
 package com.madgarage.api.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
-@Table(name = "order_items")
+@Table(name = "return_request_items")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString
-public class OrderItem {
+public class ReturnRequestItem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id", nullable = false)
+    @JoinColumn(name = "return_request_id", nullable = false)
     @JsonIgnore
-    @ToString.Exclude
-    private Order order;
+    private ReturnRequest returnRequest;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+    @JoinColumn(name = "order_item_id", nullable = false)
+    private OrderItem orderItem;
 
     private Integer quantity;
-    private Double priceAtPurchase;
 }

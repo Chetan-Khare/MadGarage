@@ -15,9 +15,12 @@ public interface CouponRepository extends JpaRepository<Coupon, Long> {
     @Query("SELECT c FROM Coupon c WHERE LOWER(c.code) = LOWER(:code)")
     Optional<Coupon> findByCodeIgnoreCaseWithLock(@org.springframework.data.repository.query.Param("code") String code);
 
-    @Query("SELECT c FROM Coupon c WHERE c.isActive = true " +
-           "AND (c.startDate IS NULL OR c.startDate <= :now) " +
-           "AND (c.endDate IS NULL OR c.endDate >= :now) " +
-           "AND (c.usageLimit IS NULL OR c.usedCount < c.usageLimit)")
+    @Query("""
+            SELECT c FROM Coupon c
+            WHERE c.isActive IS TRUE
+            AND (c.startDate IS NULL OR c.startDate <= :now)
+            AND (c.endDate IS NULL OR c.endDate >= :now)
+            AND (c.usageLimit IS NULL OR c.usedCount < c.usageLimit)
+            """)
     List<Coupon> findActiveCoupons(@Param("now") LocalDateTime now);
 }

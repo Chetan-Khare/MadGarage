@@ -77,6 +77,12 @@ public class ReturnController {
         return ResponseEntity.ok(mapToDto(returnService.finalizeRefund(id)));
     }
 
+    @PutMapping("/admin/{id}/retry-refund")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('WORKER')")
+    public ResponseEntity<ReturnResponseDto> retryRefund(@PathVariable Long id) {
+        return ResponseEntity.ok(mapToDto(returnService.retryRefund(id)));
+    }
+
     private ReturnResponseDto mapToDto(ReturnRequest request) {
         ReturnResponseDto dto = new ReturnResponseDto();
         dto.setId(request.getId());
@@ -90,8 +96,21 @@ public class ReturnController {
         dto.setStatus(request.getStatus());
         dto.setReplacementOrderId(request.getReplacementOrderId());
         dto.setAdminNote(request.getAdminNote());
+        dto.setRefundId(request.getRefundId());
+        dto.setRefundAmount(request.getRefundAmount());
         dto.setRequestedAt(request.getRequestedAt());
         dto.setResolvedAt(request.getResolvedAt());
+        
+        if (request.getItems() != null && !request.getItems().isEmpty()) {
+            dto.setItems(request.getItems().stream().map(item -> {
+                ReturnResponseDto.ReturnItemResponseDto itemDto = new ReturnResponseDto.ReturnItemResponseDto();
+                itemDto.setOrderItemId(item.getOrderItem().getId());
+                itemDto.setQuantity(item.getQuantity());
+                itemDto.setPartName(item.getOrderItem().getProduct() != null ? item.getOrderItem().getProduct().getPartName() : "Unknown Product");
+                return itemDto;
+            }).collect(Collectors.toList()));
+        }
+        
         return dto;
     }
 }

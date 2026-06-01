@@ -12,4 +12,5 @@ public interface ReturnRepository extends JpaRepository<ReturnRequest, Long> {
     List<ReturnRequest> findAllByOrderIdIn(List<Long> orderIds);
     Optional<ReturnRequest> findTopByOrderIdOrderByIdDesc(Long orderId);
     List<ReturnRequest> findByStatus(ReturnStatus status);
+    Optional<ReturnRequest> findByRefundId(String refundId);
 }

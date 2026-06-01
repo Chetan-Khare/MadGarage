@@ -30,6 +30,7 @@ public class OrderResponse {
     @com.fasterxml.jackson.annotation.JsonProperty("isOwner")
     private boolean owner;
 
+    @com.fasterxml.jackson.annotation.JsonProperty("isOwner")
     public boolean isOwner() { return owner; }
     public void setOwner(boolean owner) { this.owner = owner; }
     
@@ -77,6 +78,7 @@ public class OrderResponse {
         @com.fasterxml.jackson.annotation.JsonProperty("isReturnable")
         private boolean returnable;
 
+        @com.fasterxml.jackson.annotation.JsonProperty("isReturnable")
         public boolean isReturnable() { return returnable; }
         public void setReturnable(boolean returnable) { this.returnable = returnable; }
     }

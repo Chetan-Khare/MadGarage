@@ -20,4 +20,12 @@ public class ReturnRequestDto {
     private String description;
 
     private List<String> imageUrls;
+
+    private List<ReturnItemDto> items;
+
+    @Data
+    public static class ReturnItemDto {
+        private Long orderItemId;
+        private Integer quantity;
+    }
 }

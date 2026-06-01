@@ -2,6 +2,7 @@ package com.madgarage.api.services;
 
 import com.madgarage.api.dto.GarageProductDTO;
 import com.madgarage.api.dto.ProductResponse;
+import com.madgarage.api.dto.BulkProductStockResponse;
 import com.madgarage.api.enums.FitmentCategory;
 import com.madgarage.api.model.Product;
 import com.madgarage.api.model.ProductImage;
@@ -68,6 +69,20 @@ public class ProductService {
                 .map(this::mapToResponse)
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.NOT_FOUND, "Part not detected in our warehouse inventory"));
+    }
+
+    /**
+     * Returns bulk stock and availability status for a list of product IDs.
+     */
+    public List<BulkProductStockResponse> getBulkStock(List<Long> ids) {
+        return productRepository.findAllById(ids).stream()
+                .map(product -> BulkProductStockResponse.builder()
+                        .id(product.getId())
+                        .stockQuantity(product.getStockQuantity())
+                        .active(product.isActive() && !product.isFlagged())
+                        .isActive(product.isActive() && !product.isFlagged())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     /**

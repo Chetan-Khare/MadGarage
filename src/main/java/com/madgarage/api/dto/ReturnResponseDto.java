@@ -19,6 +19,16 @@ public class ReturnResponseDto {
     private ReturnStatus status;
     private Long replacementOrderId;
     private String adminNote;
+    private String refundId;
+    private Double refundAmount;
     private LocalDateTime requestedAt;
     private LocalDateTime resolvedAt;
+    private java.util.List<ReturnItemResponseDto> items;
+
+    @Data
+    public static class ReturnItemResponseDto {
+        private Long orderItemId;
+        private Integer quantity;
+        private String partName;
+    }
 }

@@ -27,6 +27,7 @@ public class ReturnService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final OrderService orderService;
+    private final RazorpayService razorpayService;
 
     @Transactional
     public ReturnRequest createReturnRequest(User user, ReturnRequestDto dto) {
@@ -74,6 +75,60 @@ public class ReturnService {
                 .status(ReturnStatus.PENDING)
                 .requestedAt(LocalDateTime.now())
                 .build();
+
+        double calculatedRefund = 0.0;
+        List<ReturnRequestDto.ReturnItemDto> itemsToReturn = dto.getItems();
+        
+        // If no items provided, default to full order return
+        if (itemsToReturn == null || itemsToReturn.isEmpty()) {
+            itemsToReturn = new java.util.ArrayList<>();
+            for (com.madgarage.api.model.OrderItem item : order.getItems()) {
+                if (item.getProduct() != null && item.getProduct().isReturnable()) {
+                    ReturnRequestDto.ReturnItemDto rDto = new ReturnRequestDto.ReturnItemDto();
+                    rDto.setOrderItemId(item.getId());
+                    rDto.setQuantity(item.getQuantity());
+                    itemsToReturn.add(rDto);
+                }
+            }
+        }
+
+        for (ReturnRequestDto.ReturnItemDto itemDto : itemsToReturn) {
+            com.madgarage.api.model.OrderItem orderItem = order.getItems().stream()
+                    .filter(i -> i.getId().equals(itemDto.getOrderItemId()))
+                    .findFirst()
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order item not found"));
+            
+            if (itemDto.getQuantity() <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return quantity must be greater than zero");
+            }
+            
+            if (itemDto.getQuantity() > orderItem.getQuantity()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return quantity exceeds purchased quantity");
+            }
+            
+            com.madgarage.api.model.ReturnRequestItem reqItem = com.madgarage.api.model.ReturnRequestItem.builder()
+                    .returnRequest(request)
+                    .orderItem(orderItem)
+                    .quantity(itemDto.getQuantity())
+                    .build();
+            request.getItems().add(reqItem);
+            
+            calculatedRefund += orderItem.getPriceAtPurchase() * itemDto.getQuantity();
+        }
+
+        // Apply proportional tax and deduct proportional discounts. Excludes shipping and platform fees.
+        double baseCalculated = calculatedRefund;
+        if (order.getSubtotal() != null && order.getSubtotal() > 0) {
+            double proportion = baseCalculated / order.getSubtotal();
+            if (order.getDiscountAmount() != null && order.getDiscountAmount() > 0) {
+                calculatedRefund -= (order.getDiscountAmount() * proportion);
+            }
+            if (order.getTaxAmount() != null && order.getTaxAmount() > 0) {
+                calculatedRefund += (order.getTaxAmount() * proportion);
+            }
+        }
+
+        request.setRefundAmount(calculatedRefund);
 
         order.setStatus(OrderStatus.RETURN_REQUESTED);
         orderRepository.save(order);
@@ -139,20 +194,31 @@ public class ReturnService {
 
         // Restore stock if the item is fit for resale (e.g., WRONG_FITMENT)
         if (request.getReason() == com.madgarage.api.enums.ReturnReason.WRONG_FITMENT) {
-            restoreOrderStock(order);
+            restoreOrderStock(request);
         }
         
         return returnRepository.save(request);
     }
 
-    private void restoreOrderStock(Order order) {
-        for (com.madgarage.api.model.OrderItem item : order.getItems()) {
-            if (item.getProduct() != null && item.getProduct().isReturnable()) {
-                // HIGH-04 FIX: Use pessimistic write lock to avoid lost updates under concurrency
-                com.madgarage.api.model.Product p = productRepository.findByIdWithLock(item.getProduct().getId())
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found: " + item.getProduct().getId()));
-                p.setStockQuantity(p.getStockQuantity() + item.getQuantity());
-                productRepository.save(p);
+    private void restoreOrderStock(ReturnRequest request) {
+        Order order = request.getOrder();
+        if (request.getItems() != null && !request.getItems().isEmpty()) {
+            for (com.madgarage.api.model.ReturnRequestItem reqItem : request.getItems()) {
+                if (reqItem.getOrderItem() != null && reqItem.getOrderItem().getProduct() != null && reqItem.getOrderItem().getProduct().isReturnable()) {
+                    com.madgarage.api.model.Product p = productRepository.findByIdWithLock(reqItem.getOrderItem().getProduct().getId())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found: " + reqItem.getOrderItem().getProduct().getId()));
+                    p.setStockQuantity(p.getStockQuantity() + reqItem.getQuantity());
+                    productRepository.save(p);
+                }
+            }
+        } else {
+            for (com.madgarage.api.model.OrderItem item : order.getItems()) {
+                if (item.getProduct() != null && item.getProduct().isReturnable()) {
+                    com.madgarage.api.model.Product p = productRepository.findByIdWithLock(item.getProduct().getId())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found: " + item.getProduct().getId()));
+                    p.setStockQuantity(p.getStockQuantity() + item.getQuantity());
+                    productRepository.save(p);
+                }
             }
         }
     }
@@ -166,20 +232,53 @@ public class ReturnService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request is not for refund");
         }
 
-        request.setStatus(ReturnStatus.REFUNDED);
-        request.setResolvedAt(LocalDateTime.now());
+        if (request.getStatus() == ReturnStatus.REFUNDED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refund has already been completed for this request");
+        }
 
         Order order = request.getOrder();
+        double amountToRefund = request.getRefundAmount() != null ? request.getRefundAmount() : order.getGrandTotal();
+
+        if (order.getPaymentId() != null && !order.getPaymentId().isBlank()) {
+            try {
+                com.razorpay.Refund rzpRefund = razorpayService.refundPayment(order.getPaymentId(), amountToRefund, "refund_" + order.getId());
+                request.setRefundId(rzpRefund.get("id"));
+            } catch (com.razorpay.RazorpayException e) {
+                request.setStatus(ReturnStatus.REFUND_FAILED);
+                request.setAdminNote("Razorpay Refund Failed: " + e.getMessage());
+                return returnRepository.save(request);
+            }
+        }
+
+        request.setStatus(ReturnStatus.REFUNDED);
+        request.setResolvedAt(LocalDateTime.now());
+        
+        // If the order is already marked REFUNDED, this is a retry from a webhook failure.
+        // We must avoid restoring stock a second time.
+        boolean isRetry = (order.getStatus() == OrderStatus.REFUNDED);
+
         order.setStatus(OrderStatus.REFUNDED);
         orderRepository.save(order);
 
-        // CRIT-03 FIX: Restore stock for all reasons. Since WRONG_FITMENT is already restored in markPickedUp(),
-        // we restore stock here for other reasons (e.g. DAMAGED or OTHER returns to be inspected/restocked).
-        if (request.getReason() != com.madgarage.api.enums.ReturnReason.WRONG_FITMENT) {
-            restoreOrderStock(order);
+        // CRIT-03 FIX: Restore stock for all reasons EXCEPT WRONG_FITMENT (which is restored at pickup).
+        // Skip this step if it's a retry, as stock was already restored on the first attempt.
+        if (!isRetry && request.getReason() != com.madgarage.api.enums.ReturnReason.WRONG_FITMENT) {
+            restoreOrderStock(request);
         }
 
         return returnRepository.save(request);
+    }
+
+    @Transactional
+    public ReturnRequest retryRefund(Long returnId) {
+        ReturnRequest request = returnRepository.findById(returnId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found"));
+        
+        if (request.getStatus() != ReturnStatus.REFUND_FAILED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Can only retry if refund failed");
+        }
+        
+        return finalizeRefund(returnId);
     }
 
     @Transactional(readOnly = true)

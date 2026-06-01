@@ -36,3 +36,7 @@ build/
 .env
 *.env
 application-local.yml
+
+# Local dynamic uploads and guides data
+/data/
+

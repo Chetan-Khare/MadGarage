@@ -17,7 +17,7 @@ import java.util.Optional;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
-    @Query(value = "SELECT SUM(grand_total) FROM orders", nativeQuery = true)
+    @Query(value = "SELECT SUM(grand_total) FROM orders WHERE status NOT IN ('PENDING_PAYMENT', 'CANCELLED', 'RETURNED', 'REFUNDED')", nativeQuery = true)
     Double calculateTotalRevenue();
 
     @Query("SELECT o FROM Order o " +
@@ -52,13 +52,14 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findAllWithItems();
 
     @Query("SELECT SUM(oi.priceAtPurchase * oi.quantity) FROM OrderItem oi " +
-           "WHERE oi.product.seller = :seller")
+           "WHERE oi.product.seller = :seller AND oi.order.status NOT IN (com.madgarage.api.enums.OrderStatus.PENDING_PAYMENT, com.madgarage.api.enums.OrderStatus.CANCELLED, com.madgarage.api.enums.OrderStatus.RETURNED, com.madgarage.api.enums.OrderStatus.REFUNDED)")
     Double calculateRevenueBySeller(@Param("seller") User seller);
 
     @Query(value = "SELECT SUM(grand_total) as total, " +
            "DATE_FORMAT(order_date, '%Y-%m') as month " +
            "FROM orders " +
            "WHERE order_date >= DATE_SUB(NOW(), INTERVAL 6 MONTH) " +
+           "AND status NOT IN ('PENDING_PAYMENT', 'CANCELLED', 'RETURNED', 'REFUNDED') " +
            "GROUP BY month " +
            "ORDER BY month ASC", nativeQuery = true)
     List<Object[]> getMonthlyRevenueForLastSixMonths();
