@@ -39,6 +39,7 @@ public class Order {
     private Double shippingFee;
     private Double platformFee;
     private Double grandTotal;
+    private Double totalSavings;
 
     @Enumerated(EnumType.STRING)
     private OrderStatus status;

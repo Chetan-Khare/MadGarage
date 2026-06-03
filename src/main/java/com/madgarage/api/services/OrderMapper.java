@@ -82,6 +82,7 @@ public class OrderMapper {
                         .color(item.getProduct() != null ? item.getProduct().getColor() : "N/A")
                         .quantity(item.getQuantity())
                         .priceAtPurchase(item.getPriceAtPurchase())
+                        .mrpAtPurchase(item.getMrpAtPurchase())
                         .returnable(item.getProduct() != null ? item.getProduct().isReturnable() : true)
                         .build())
                 .collect(Collectors.toList());
@@ -119,6 +120,7 @@ public class OrderMapper {
                 .shippingFee(shipFee)
                 .platformFee(order.getPlatformFee() != null ? order.getPlatformFee() : 0.0)
                 .grandTotal(grandTotal)
+                .totalSavings(order.getTotalSavings() != null ? order.getTotalSavings() : 0.0)
                 .status(order.getStatus() != null ? order.getStatus().name() : null)
                 .appliedCouponCode(order.getAppliedCouponCode())
                 .discountAmount(order.getDiscountAmount() != null ? order.getDiscountAmount() : 0.0)

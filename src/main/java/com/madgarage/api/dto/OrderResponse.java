@@ -20,6 +20,7 @@ public class OrderResponse {
     private Double shippingFee;
     private Double platformFee;
     private Double grandTotal;
+    private Double totalSavings;
     private String status;
     private Double discountAmount;
     private String appliedCouponCode;
@@ -74,6 +75,7 @@ public class OrderResponse {
         private String color;
         private Integer quantity;
         private Double priceAtPurchase;
+        private Double mrpAtPurchase;
         
         @com.fasterxml.jackson.annotation.JsonProperty("isReturnable")
         private boolean returnable;

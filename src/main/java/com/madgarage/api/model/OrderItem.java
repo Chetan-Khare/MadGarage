@@ -30,4 +30,5 @@ public class OrderItem {
 
     private Integer quantity;
     private Double priceAtPurchase;
+    private Double mrpAtPurchase;
 }

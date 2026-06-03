@@ -81,6 +81,7 @@ public class OrderService {
     @Transactional
     public OrderResponse placeOrder(User customer, OrderRequest request) {
         double subtotal = 0.0;
+        double totalSavings = 0.0;
         List<OrderItem> orderItems = new ArrayList<>();
 
         for (OrderRequest.CartItemDto itemDto : request.getItems()) {
@@ -101,6 +102,7 @@ public class OrderService {
             productRepository.save(product);
 
             double itemPrice = product.getPrice();
+            Double itemMrp = product.getMrp(); // Can be null
 
             // Apply tiered garage discount if the customer is a garage
             boolean isGarage = customer.getRole() == com.madgarage.api.enums.Role.ROLE_GARAGE;
@@ -109,11 +111,15 @@ public class OrderService {
             }
 
             subtotal += itemPrice * itemDto.getQuantity();
+            if (itemMrp != null && itemMrp > itemPrice) {
+                totalSavings += (itemMrp - itemPrice) * itemDto.getQuantity();
+            }
 
             OrderItem orderItem = OrderItem.builder()
                     .product(product)
                     .quantity(itemDto.getQuantity())
                     .priceAtPurchase(itemPrice)
+                    .mrpAtPurchase(itemMrp)
                     .build();
             orderItems.add(orderItem);
         }
@@ -132,6 +138,8 @@ public class OrderService {
             discountAmount = couponService.calculateDiscount(appliedCoupon, subtotal);
         }
 
+        totalSavings += discountAmount; // Add coupon discount to total savings
+
         double grandTotal = subtotal + currentShippingFee + currentPlatformFee - discountAmount;
 
         Order order = Order.builder()
@@ -143,6 +151,7 @@ public class OrderService {
                 .appliedCouponCode(appliedCoupon != null ? appliedCoupon.getCode() : null)
                 .discountAmount(discountAmount)
                 .grandTotal(grandTotal)
+                .totalSavings(totalSavings)
                 .status(OrderStatus.PENDING_PAYMENT)
                 .orderDate(LocalDateTime.now())
                 .shippingAddress(request.getShippingAddress())
