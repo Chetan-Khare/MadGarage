@@ -49,10 +49,9 @@ public class RazorpayService {
     }
 
     public boolean verifySignature(String razorpayOrderId, String razorpayPaymentId, String razorpaySignature) {
-        // Securely allow mock payment simulation only in development / test environments (when keyId is a test key)
-        if (keyId == null || keyId.trim().startsWith("$") || keyId.trim().startsWith("rzp_test_") || (razorpaySignature != null && razorpaySignature.startsWith("mock_signature_"))) {
-            return true;
-        }
+        boolean isMockEnv = keyId == null || keyId.trim().startsWith("$") || keyId.trim().startsWith("rzp_test_");
+        if (isMockEnv) return true;
+        if (razorpaySignature != null && razorpaySignature.startsWith("mock_signature_")) return false;
 
         if (client == null) {
             return true; // Gracefully allow mocks if client is absent

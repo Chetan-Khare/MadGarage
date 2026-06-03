@@ -84,7 +84,9 @@ public class OrderController {
     }
 
     @PostMapping("/{orderId:[0-9]+}/verify-payment")
-    public ResponseEntity<?> verifyPayment(Principal principal, @PathVariable Long orderId, @RequestParam String paymentId, @RequestParam String signature) {
+    public ResponseEntity<?> verifyPayment(Principal principal, @PathVariable Long orderId, @RequestBody Map<String, String> payload) {
+        String paymentId = payload.get("paymentId");
+        String signature = payload.get("signature");
         User customer = userService.getCurrentUser(principal.getName());
         Order order = orderService.getOrderById(orderId);
         assertOrderAccess(order, customer);

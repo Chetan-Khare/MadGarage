@@ -192,10 +192,8 @@ public class ReturnService {
             orderRepository.save(order);
         }
 
-        // Restore stock if the item is fit for resale (e.g., WRONG_FITMENT)
-        if (request.getReason() == com.madgarage.api.enums.ReturnReason.WRONG_FITMENT) {
-            restoreOrderStock(request);
-        }
+        // Always restore stock when item is physically returned
+        restoreOrderStock(request);
         
         return returnRepository.save(request);
     }
@@ -227,6 +225,10 @@ public class ReturnService {
     public ReturnRequest finalizeRefund(Long returnId) {
         ReturnRequest request = returnRepository.findById(returnId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found"));
+
+        if (request.getStatus() != ReturnStatus.PICKED_UP && request.getStatus() != ReturnStatus.REFUND_FAILED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot finalize refund — item has not been picked up yet.");
+        }
 
         if (request.getRequestType() != ReturnRequestType.REFUND) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request is not for refund");
@@ -260,11 +262,7 @@ public class ReturnService {
         order.setStatus(OrderStatus.REFUNDED);
         orderRepository.save(order);
 
-        // CRIT-03 FIX: Restore stock for all reasons EXCEPT WRONG_FITMENT (which is restored at pickup).
-        // Skip this step if it's a retry, as stock was already restored on the first attempt.
-        if (!isRetry && request.getReason() != com.madgarage.api.enums.ReturnReason.WRONG_FITMENT) {
-            restoreOrderStock(request);
-        }
+        // Stock is now restored unconditionally during markPickedUp. No need to restore here.
 
         return returnRepository.save(request);
     }
