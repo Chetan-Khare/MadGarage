@@ -7,7 +7,6 @@ import com.madgarage.api.services.RateLimitingService;
 import io.github.bucket4j.ConsumptionProbe;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -69,7 +68,7 @@ public class GarageChatController {
                 for (MultipartFile img : images) {
                     if (img != null && !img.isEmpty()) {
                         if (img.getSize() > 5 * 1024 * 1024) {
-                            return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).build();
+                            return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).build();
                         }
                         imageBytesList.add(img.getBytes());
                     }
@@ -118,5 +117,54 @@ public class GarageChatController {
             @RequestParam(defaultValue = "50") int size) {
         // Use pagination to prevent OOM/timeouts on large conversation logs
         return ResponseEntity.ok(assistantService.getChatHistoryPaged(userId, page, size));
+    }
+
+    // ── Streaming Endpoint ───────────────────────────────────────────────────
+
+    @PostMapping(value = "/chat/stream", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
+    public reactor.core.publisher.Flux<org.springframework.http.codec.ServerSentEvent<String>> streamChat(
+            Principal principal,
+            @RequestParam(value = "message", required = false) String message) {
+
+        String identifier = principal.getName();
+
+        // Reuse the same rate-limit bucket as the standard /chat endpoint
+        ConsumptionProbe probe = rateLimitingService.probeAssistant(identifier);
+        if (!probe.isConsumed()) {
+            return reactor.core.publisher.Flux.just(
+                    org.springframework.http.codec.ServerSentEvent.<String>builder()
+                            .event("error")
+                            .data("RATE_LIMITED")
+                            .build()
+            );
+        }
+
+        if (message == null || message.trim().isEmpty()) {
+            return reactor.core.publisher.Flux.just(
+                    org.springframework.http.codec.ServerSentEvent.<String>builder()
+                            .data("[DONE]")
+                            .build()
+            );
+        }
+
+        User user = userRepository.findByEmail(identifier)
+            .or(() -> userRepository.findByPhone(identifier))
+            .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        StringBuilder fullResponse = new StringBuilder();
+
+        return assistantService.streamResponse(user.getId(), message)
+                .doOnNext(chunk -> {
+                    if (chunk != null) fullResponse.append(chunk);
+                })
+                .map(chunk -> org.springframework.http.codec.ServerSentEvent.<String>builder()
+                        .data(chunk)
+                        .build())
+                .concatWith(reactor.core.publisher.Flux.just(
+                        org.springframework.http.codec.ServerSentEvent.<String>builder().data("[DONE]").build()
+                ))
+                .doFinally(signalType -> {
+                    assistantService.saveAiMessage(user.getId(), fullResponse.toString());
+                });
     }
 }

@@ -4,9 +4,12 @@ import com.madgarage.api.enums.PartRequestStatus;
 import com.madgarage.api.model.PartRequest;
 import com.madgarage.api.repository.PartRequestRepository;
 import com.madgarage.api.services.ExpoNotificationService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashMap;
 import java.util.List;
@@ -20,11 +23,14 @@ public class AdminPartRequestController {
 
     private final PartRequestRepository partRequestRepository;
     private final ExpoNotificationService notificationService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public AdminPartRequestController(PartRequestRepository partRequestRepository,
-                                      ExpoNotificationService notificationService) {
+                                      ExpoNotificationService notificationService,
+                                      SimpMessagingTemplate messagingTemplate) {
         this.partRequestRepository = partRequestRepository;
         this.notificationService = notificationService;
+        this.messagingTemplate = messagingTemplate;
     }
 
     @GetMapping
@@ -61,7 +67,7 @@ public class AdminPartRequestController {
     @PutMapping("/{id}/status")
     public ResponseEntity<?> updateStatus(@PathVariable Long id, @RequestParam String status) {
         PartRequest request = partRequestRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Request not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Part request not found"));
 
         try {
             PartRequestStatus newStatus = PartRequestStatus.valueOf(status.toUpperCase());
@@ -80,6 +86,11 @@ public class AdminPartRequestController {
             Map<String, Object> map = new HashMap<>();
             map.put("id", saved.getId());
             map.put("status", saved.getStatus().name());
+
+            messagingTemplate.convertAndSend("/topic/admin/part-requests", (Object) Map.of(
+                "type", "STATUS_UPDATE",
+                "payload", map
+            ));
 
             return ResponseEntity.ok(map);
         } catch (IllegalArgumentException e) {

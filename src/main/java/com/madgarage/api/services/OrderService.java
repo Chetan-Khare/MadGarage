@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import com.madgarage.api.model.*;
 import com.madgarage.api.repository.*;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.madgarage.api.enums.Role;
@@ -30,11 +31,13 @@ public class OrderService {
     private final OrderMapper orderMapper;
     private final RazorpayService razorpayService;
     private final CouponService couponService;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public OrderService(OrderRepository orderRepository, ProductRepository productRepository, 
-                        OrderRatingRepository orderRatingRepository, PricingService pricingService, 
+    public OrderService(OrderRepository orderRepository, ProductRepository productRepository,
+                        OrderRatingRepository orderRatingRepository, PricingService pricingService,
                         SystemSettingService systemSettingService, ShippingZoneService shippingZoneService,
-                        OrderMapper orderMapper, RazorpayService razorpayService, CouponService couponService) {
+                        OrderMapper orderMapper, RazorpayService razorpayService, CouponService couponService,
+                        SimpMessagingTemplate messagingTemplate) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.orderRatingRepository = orderRatingRepository;
@@ -44,6 +47,7 @@ public class OrderService {
         this.orderMapper = orderMapper;
         this.razorpayService = razorpayService;
         this.couponService = couponService;
+        this.messagingTemplate = messagingTemplate;
     }
 
 
@@ -217,7 +221,23 @@ public class OrderService {
         order.setPaymentVerified(true);
         
         order = orderRepository.save(order);
-        return orderMapper.mapToOrderResponse(order, order.getUser());
+        OrderResponse response = orderMapper.mapToOrderResponse(order, order.getUser());
+        broadcastOrderUpdate(order.getId(), response);
+        
+        // Broadcast new order to seller
+        if (order.getItems() != null && !order.getItems().isEmpty()) {
+            User seller = order.getItems().get(0).getProduct().getSeller();
+            if (seller != null) {
+                try {
+                    messagingTemplate.convertAndSend("/topic/seller/" + seller.getId() + "/orders/new", response);
+                } catch (Exception e) {
+                    org.slf4j.LoggerFactory.getLogger(OrderService.class)
+                            .warn("[WS] Failed to broadcast new order to sellerId={}: {}", seller.getId(), e.getMessage());
+                }
+            }
+        }
+        
+        return response;
     }
 
     // SEC-06 FIX: Uses JOIN FETCH so order.getUser() is never null/lazy-proxy
@@ -268,7 +288,9 @@ public class OrderService {
 
         order.setStatus(targetStatus);
         order = orderRepository.save(order);
-        return orderMapper.mapToOrderResponse(order, order.getUser());
+        OrderResponse response = orderMapper.mapToOrderResponse(order, order.getUser());
+        broadcastOrderUpdate(orderId, response);
+        return response;
     }
 
     @Transactional
@@ -306,7 +328,9 @@ public class OrderService {
 
         order.setStatus(OrderStatus.CANCELLED);
         order = orderRepository.save(order);
-        return orderMapper.mapToOrderResponse(order, customer);
+        OrderResponse response = orderMapper.mapToOrderResponse(order, customer);
+        broadcastOrderUpdate(orderId, response);
+        return response;
     }
 
     private boolean isValidTransition(OrderStatus current, OrderStatus target) {
@@ -462,7 +486,26 @@ public class OrderService {
         }
 
         orderRepository.save(order);
-        return orderMapper.mapToOrderResponse(order, null);
+        OrderResponse response = orderMapper.mapToOrderResponse(order, null);
+        broadcastOrderUpdate(orderId, response);
+        return response;
+    }
+
+    // ─── WebSocket Broadcast Helper ───────────────────────────────────────────
+
+    /**
+     * Broadcasts the updated order DTO to all subscribers of /topic/orders/{orderId}.
+     * Both the customer and any admin/seller/garage viewing that order will receive
+     * the push instantly without needing to poll.
+     */
+    private void broadcastOrderUpdate(Long orderId, OrderResponse orderResponse) {
+        try {
+            messagingTemplate.convertAndSend("/topic/orders/" + orderId, orderResponse);
+        } catch (Exception e) {
+            // Non-fatal: log and continue. WebSocket failure must never break the REST flow.
+            org.slf4j.LoggerFactory.getLogger(OrderService.class)
+                    .warn("[WS] Failed to broadcast order update for orderId={}: {}", orderId, e.getMessage());
+        }
     }
 
     @Scheduled(fixedDelay = 600000) // Every 10 minutes

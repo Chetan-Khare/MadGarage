@@ -9,8 +9,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+
 import java.security.Principal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/requests")
@@ -18,10 +22,12 @@ public class PartRequestController {
 
     private final PartRequestRepository partRequestRepository;
     private final UserService userService;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public PartRequestController(PartRequestRepository partRequestRepository, UserService userService) {
+    public PartRequestController(PartRequestRepository partRequestRepository, UserService userService, SimpMessagingTemplate messagingTemplate) {
         this.partRequestRepository = partRequestRepository;
         this.userService = userService;
+        this.messagingTemplate = messagingTemplate;
     }
 
     @PostMapping
@@ -43,6 +49,32 @@ public class PartRequestController {
                 .build();
                 
         PartRequest saved = partRequestRepository.save(partRequest);
+        
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", saved.getId());
+        map.put("make", saved.getMake());
+        map.put("model", saved.getModel());
+        map.put("year", saved.getYear());
+        map.put("partName", saved.getPartName());
+        map.put("description", saved.getDescription());
+        map.put("status", saved.getStatus().name());
+        map.put("createdAt", saved.getCreatedAt());
+
+        if (saved.getUser() != null) {
+            map.put("customerName", saved.getUser().getFirstName() + " " + saved.getUser().getLastName());
+            map.put("customerPhone", saved.getUser().getPhone());
+            map.put("customerEmail", saved.getUser().getEmail());
+        } else {
+            map.put("customerName", saved.getCustomerName());
+            map.put("customerPhone", saved.getCustomerPhone());
+            map.put("customerEmail", "Guest User");
+        }
+
+        messagingTemplate.convertAndSend("/topic/admin/part-requests", (Object) Map.of(
+            "type", "NEW",
+            "payload", map
+        ));
+        
         return ResponseEntity.ok(saved);
     }
     

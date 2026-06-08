@@ -30,4 +30,8 @@ public interface VehicleRepository extends JpaRepository<Vehicle, Long> {
     List<String> findDistinctEngineTypesByVariant(@Param("make") String make, @Param("model") String model, @Param("year") Integer year, @Param("fuel") String fuel, @Param("trim") String trim);
 
     List<Vehicle> findByMakeAndModelAndYearAndFuelTypeAndTrimAndEngineType(String make, String model, Integer year, String fuel, String trim, String engine);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query(value = "DELETE FROM product_fitment WHERE vehicle_id = :vehicleId", nativeQuery = true)
+    void deleteFitmentsByVehicleId(@Param("vehicleId") Long vehicleId);
 }

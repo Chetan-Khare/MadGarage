@@ -203,4 +203,37 @@ public class GarageAssistantService {
     public org.springframework.data.domain.Page<ChatMessage> getChatHistoryPaged(Long userId, int page, int size) {
         return chatMessageRepository.findByUserIdOrderByCreatedAtDesc(userId, org.springframework.data.domain.PageRequest.of(page, size));
     }
+
+    // ── Streaming (SSE) ────────────────────────────────────────────────────────
+    
+    public reactor.core.publisher.Flux<String> streamResponse(Long userId, String userText) {
+        saveMessage(userId, userText, ChatMessage.SenderType.USER, null);
+
+        String text = (userText == null || userText.isBlank()) ? "hi" : userText.trim();
+        
+        if (isGreeting(text)) {
+            String greetingReply = "Hey there! 👋 I'm your Virtual Mechanic at Mad Garage!\n\nI can help you find the right parts for your vehicle. Just tell me:\n• Your vehicle's **Year, Make & Model** (e.g. \"2019 Hyundai i10\")\n• What part you're looking for (e.g. brake pads, air filter)\n\nOr upload a photo of the part or damage and I'll take a look! 🔧";
+            return reactor.core.publisher.Flux.just(greetingReply);
+        }
+
+        String systemPrompt = """
+        IDENTITY:
+        You are the Mad Garage Virtual Mechanic. You are a conversational AI assistant.
+        
+        STRICT LIMITATIONS:
+        - You ONLY discuss automotive parts, vehicle identification, and garage services.
+        
+        GOAL:
+        Provide a helpful, conversational response to the user's automotive query. Ask for Make, Model, and Year if they are looking for specific parts and haven't provided them. Keep it brief.
+        """;
+
+        return chatClient.prompt()
+                .system(systemPrompt)
+                .user(text)
+                .stream().content();
+    }
+    
+    public void saveAiMessage(Long userId, String content) {
+        saveMessage(userId, content, ChatMessage.SenderType.AI, null);
+    }
 }

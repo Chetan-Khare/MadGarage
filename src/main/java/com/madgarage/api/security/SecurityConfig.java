@@ -87,6 +87,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/config/**").permitAll()
                         .requestMatchers("/api/health/**").permitAll()
+                        // WebSocket / STOMP endpoint — auth is handled by WebSocketAuthChannelInterceptor
+                        .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/api/assistant/**").authenticated()
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/api/vehicles/**").permitAll()

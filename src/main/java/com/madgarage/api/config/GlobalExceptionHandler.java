@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -18,10 +19,11 @@ import java.util.Map;
 
 /**
  * Global exception handler — the safety net for all unhandled exceptions.
- * P1 FIX: Expanded from handling only validation errors to covering:
+ * Expanded to cover:
  *   - Bean validation failures (400)
  *   - ResponseStatusException (propagated from service layer with specific status codes)
  *   - SQL constraint violations like duplicate email (409)
+ *   - Spring Security AuthorizationDeniedException (403) — must be explicit or catch-all returns 500
  *   - All other uncaught exceptions (500) — logs full trace server-side, returns clean message to client
  */
 @RestControllerAdvice
@@ -93,6 +95,18 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles Spring Security method-level @PreAuthorize denials.
+     * Without this, AuthorizationDeniedException falls through to the 500 catch-all.
+     * Returns 403 Forbidden with a clean message.
+     */
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ResponseEntity<Map<String, String>> handleAuthorizationDenied(AuthorizationDeniedException ex) {
+        log.warn("[Security] Access denied: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", "Access denied. You do not have permission to perform this action."));
+    }
+
+    /**
      * Catch-all safety net for any unhandled exception.
      * Logs the full stack trace server-side only — NEVER sent to the client.
      * Returns a generic 500 message to prevent internal detail leakage.
@@ -102,5 +116,13 @@ public class GlobalExceptionHandler {
         log.error("Unhandled exception caught by GlobalExceptionHandler: ", ex);
         return ResponseEntity.status(500)
                 .body(Map.of("error", "An unexpected error occurred. Please try again later."));
+    }
+
+    /**
+     * Suppress stack trace for 404 static resource requests (e.g. /favicon.ico)
+     */
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<Void> handleNoResourceFound(org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+        return ResponseEntity.notFound().build();
     }
 }

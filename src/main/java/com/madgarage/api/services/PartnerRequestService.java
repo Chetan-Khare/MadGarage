@@ -30,7 +30,7 @@ public class PartnerRequestService {
      * Public submission of a new partnership application.
      */
     @Transactional
-    public void submitRequest(PartnerRequestDTO dto) {
+    public PartnerRequest submitRequest(PartnerRequestDTO dto) {
         if (userRepository.findByEmail(dto.getEmail().toLowerCase()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is already registered as an active user.");
         }
@@ -48,7 +48,7 @@ public class PartnerRequestService {
                 .status(PartnerRequest.RequestStatus.PENDING)
                 .build();
 
-        partnerRequestRepository.save(request);
+        return partnerRequestRepository.save(request);
     }
 
     /**

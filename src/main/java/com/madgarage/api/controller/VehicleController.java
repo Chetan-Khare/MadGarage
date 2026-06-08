@@ -70,7 +70,7 @@ public class VehicleController {
 
     @PostMapping("/admin")
     @PreAuthorize("hasRole('ADMIN') or hasRole('WORKER')")
-    public ResponseEntity<Vehicle> addVehicle(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<List<Vehicle>> addVehicle(@RequestBody Map<String, Object> body) {
         return ResponseEntity.ok(vehicleService.addVehicle(body));
     }
 
@@ -81,5 +81,11 @@ public class VehicleController {
             return ResponseEntity.ok().build();
         }
         return ResponseEntity.notFound().build();
+    }
+
+    @GetMapping("/admin/cleanup")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('WORKER')")
+    public ResponseEntity<String> cleanupData() {
+        return ResponseEntity.ok(vehicleService.cleanupDuplicateMakesAndModels());
     }
 }
