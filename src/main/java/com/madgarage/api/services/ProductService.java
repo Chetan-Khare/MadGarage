@@ -81,6 +81,10 @@ public class ProductService {
                         .stockQuantity(product.getStockQuantity())
                         .active(product.isActive() && !product.isFlagged())
                         .isActive(product.isActive() && !product.isFlagged())
+                        .price(product.getPrice())
+                        .mrp(product.getMrp())
+                        .originalPrice(product.getPrice())
+                        .garagePrice(pricingService.calculateGaragePrice(product))
                         .build())
                 .collect(Collectors.toList());
     }

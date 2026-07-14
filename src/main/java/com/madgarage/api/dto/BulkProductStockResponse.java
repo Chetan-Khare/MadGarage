@@ -21,4 +21,8 @@ public class BulkProductStockResponse {
     private boolean active;
     /** Serialized as "isActive" in JSON (Lombok getter: isIsActive → "isActive"). */
     private boolean isActive;
+    private Double price;
+    private Double garagePrice;
+    private Double mrp;
+    private Double originalPrice;
 }
